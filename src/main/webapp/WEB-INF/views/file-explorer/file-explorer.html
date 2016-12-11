@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head lang="en">
+    <meta charset="UTF-8">
+    <title>Dropbox</title>
+    <link href="../../../resources/css/styles.css" rel="stylesheet" th:href="@{/resources/css/styles.css}"/>
+    <link href="../../../resources/css/bootstrap.min.css" rel="stylesheet" media="screen"
+          th:href="@{/resources/css/bootstrap.min.css}"/>
+    <link href="../../../resources/css/context.bootstrap.css" rel="stylesheet" media="screen"
+          th:href="@{/resources/css/context.bootstrap.css}"/>
+    <link href="../../../resources/css/context.standalone.css" rel="stylesheet" media="screen"
+          th:href="@{/resources/css/context.standalone.css}"/>
+</head>
+<body>
+<div th:replace="fragments/layout :: header"></div>
+<div class="container">
+    <div class="filemanager">
+
+        <ul class="data" th:if="${!cloudFolder.getFolders().isEmpty() or !cloudFolder.getFiles().isEmpty()}">
+            <li th:each="folder : ${cloudFolder.getFolders()}" class="folders context-menu-folder">
+                <a th:href="'/dropbox/folder?path=' + ${folder.getPath()}" th:title="${folder.getShowName()}"
+                   class="folders">
+                    <input type="hidden" name="documentLink" th:value="${folder.getPath()}"/>
+                    <span class="icon folder">     </span> <span class="name"><p
+                        th:text="${folder.getShowName()}"/></span>
+                </a>
+            </li>
+
+            <li th:each="file : ${cloudFolder.getFiles()}" class="files context-menu-file">
+                <a th:href="'/dropbox/download?path=' + ${file.getPath()}" th:title="${file.getShowName()}"
+                   class="files">
+                    <input type="hidden" name="documentLink" th:value="${file.getPath()}"/>
+                    <span th:class="'icon file f-' + ${file.getFileType()}"><p th:text="${file.getFileType()}"/></span>
+                    <span class="name"><p th:text="${file.getShowName()}"/></span>
+                    <span class="details"><p th:text="${file.getSize()}"/></span>
+                </a></li>
+
+        </ul>
+
+
+        <div class="nothingfound">
+            <div class="nofiles"></div>
+            <span>No files here.</span>
+        </div>
+
+    </div>
+</div>
+<div th:replace="fragments/layout :: footer"></div>
+<!--<footer>-->
+<!--<a class="tz" href="http://tutorialzine.com/2014/09/cute-file-browser-jquery-ajax-php/">Cute File Browser with jQuery, AJAX and PHP</a>-->
+<!--<div id="tzine-actions"></div>-->
+<!--<span class="close"></span>-->
+<!--</footer>-->
+
+<!-- Include our script files -->
+<script src="../../../resources/js/jquery-1.11.0.min.js" th:src="@{/resources/js/jquery-1.11.0.min.js}"></script>
+<script src="../../../resources/js/context.js" th:src="@{/resources/js/context.js}"></script>
+<script src="../../../resources/js/file-explorer.js" th:src="@{/resources/js/file-explorer.js}"></script>
+
+</body>
+</html>
