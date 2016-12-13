@@ -3,9 +3,9 @@ package by.fpm.barbuk.oauth;
 import by.fpm.barbuk.dropbox.CloudFile;
 import by.fpm.barbuk.dropbox.CloudFolder;
 import by.fpm.barbuk.dropbox.DropboxUser;
+import com.temboo.Library.Dropbox.FileOperations.CreateFolder;
 import com.temboo.Library.Dropbox.FileOperations.DeleteFileOrFolder;
 import com.temboo.Library.Dropbox.FilesAndMetadata.GetDownloadLink;
-import com.temboo.Library.Dropbox.FilesAndMetadata.GetShareableLink;
 import com.temboo.Library.Dropbox.FilesAndMetadata.ListFolderContents;
 import com.temboo.Library.Dropbox.OAuth.FinalizeOAuth;
 import com.temboo.Library.Dropbox.OAuth.InitializeOAuth;
@@ -19,7 +19,6 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.security.SecureRandom;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 
@@ -121,8 +120,21 @@ public final class DropboxAuthHelper {
         if (listFolderContentsResults.getException() == null) {
             JSONObject result = new JSONObject(listFolderContentsResults.get_Response());
             CloudFolder cloudFolder = new CloudFolder();
-            cloudFolder.setPath(result.getString("path"));
-            cloudFolder.setShowName(cloudFolder.getPath().substring(cloudFolder.getPath().lastIndexOf("/")+1));
+
+            List<String> folderPathList = new ArrayList<>();
+            String[] folderPath = result.getString("path").split("/");
+            if(folderPath.length>=2) {
+                folderPathList.add("root");
+            }
+            for (int i = 2; i < folderPath.length; i++) {
+                StringBuffer sb = new StringBuffer();
+                for (int j = 1; j < i; j++)
+                    sb.append("/" + folderPath[j]);
+                folderPathList.add(sb.toString());
+            }
+            cloudFolder.setPath(folderPathList);
+
+            cloudFolder.setShowName(result.getString("path").substring(cloudFolder.getPath().lastIndexOf("/") + 1));
 //            cloudFolder.setPath(new String(result.getString("path").getBytes("windows-1251"), "UTF-8"));
             cloudFolder.setSize(result.getString("size"));
             cloudFolder.setDir(result.getBoolean("is_dir"));
@@ -137,7 +149,7 @@ public final class DropboxAuthHelper {
                 JSONObject object = content.getJSONObject(i);
                 cloudFile.setRev(object.getString("rev"));
                 cloudFile.setPath(object.getString("path"));
-                cloudFile.setShowName(cloudFile.getPath().substring(cloudFile.getPath().lastIndexOf("/")+1));
+                cloudFile.setShowName(cloudFile.getPath().substring(cloudFile.getPath().lastIndexOf("/") + 1));
 //                cloudFile.setPath(new String(object.getString("path").getBytes("windows-1251"), "UTF-8"));
                 cloudFile.setSize(object.getString("size"));
                 cloudFile.setReadOnly(object.getBoolean("read_only"));
@@ -191,7 +203,7 @@ public final class DropboxAuthHelper {
         return getShareableLinkResults.get_Response();*/
     }
 
-    public JSONObject delete(String path, DropboxUser user) throws TembooException, JSONException {
+    public boolean delete(String path, DropboxUser user) throws TembooException, JSONException {
 
         DeleteFileOrFolder deleteFileOrFolderChoreo = new DeleteFileOrFolder(session);
         DeleteFileOrFolder.DeleteFileOrFolderInputSet deleteFileOrFolderInputs = deleteFileOrFolderChoreo.newInputSet();
@@ -204,6 +216,23 @@ public final class DropboxAuthHelper {
 
         DeleteFileOrFolder.DeleteFileOrFolderResultSet deleteFileOrFolderResults = deleteFileOrFolderChoreo.execute(deleteFileOrFolderInputs);
         JSONObject result = new JSONObject(deleteFileOrFolderResults.get_Response());
-        return result;
+        return result.getBoolean("is_deleted");
     }
+
+    public boolean createFolder(String path, DropboxUser user) throws TembooException {
+        CreateFolder createFolderChoreo = new CreateFolder(session);
+        CreateFolder.CreateFolderInputSet createFolderInputs = createFolderChoreo.newInputSet();
+
+        createFolderInputs.set_AppKey(APP_ID);
+        createFolderInputs.set_AppSecret(APP_SECRET);
+        createFolderInputs.set_AccessToken(user.getAccessToken());
+        createFolderInputs.set_AccessTokenSecret(user.getAccessSecret());
+        createFolderInputs.set_NewFolderName(path);
+
+        CreateFolder.CreateFolderResultSet createFolderResults = createFolderChoreo.execute(createFolderInputs);
+        return true;
+
+
+    }
+
 }

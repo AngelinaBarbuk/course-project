@@ -71,7 +71,7 @@ class WebMvcConfig extends WebMvcConfigurationSupport {
         ThymeleafViewResolver thymeleafViewResolver = new ThymeleafViewResolver();
         thymeleafViewResolver.setTemplateEngine(templateEngine());
         thymeleafViewResolver.setCharacterEncoding("UTF-8");
-        thymeleafViewResolver.setRedirectHttp10Compatible(false);
+//        thymeleafViewResolver.setRedirectHttp10Compatible(false);
         return thymeleafViewResolver;
     }
 

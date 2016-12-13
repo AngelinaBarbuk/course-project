@@ -3,26 +3,44 @@
 <head lang="en">
     <meta charset="UTF-8">
     <title>Dropbox</title>
-    <link href="../../../resources/css/styles.css" rel="stylesheet" th:href="@{/resources/css/styles.css}"/>
+
     <link href="../../../resources/css/bootstrap.min.css" rel="stylesheet" media="screen"
           th:href="@{/resources/css/bootstrap.min.css}"/>
     <link href="../../../resources/css/context.bootstrap.css" rel="stylesheet" media="screen"
           th:href="@{/resources/css/context.bootstrap.css}"/>
     <link href="../../../resources/css/context.standalone.css" rel="stylesheet" media="screen"
           th:href="@{/resources/css/context.standalone.css}"/>
+    <link href="../../../resources/css/jquery-ui.css" rel="stylesheet" media="screen"
+          th:href="@{/resources/css/jquery-ui.css}"/>
+    <link href="../../../resources/css/styles.css" rel="stylesheet" th:href="@{/resources/css/styles.css}"/>
+    <!--<script src="../../../resources/js/jquery-1.12.4.js" th:src="@{/resources/js/jquery-1.12.4.js}"></script>-->
+
 </head>
 <body>
 <div th:replace="fragments/layout :: header"></div>
 <div class="container">
+
     <div class="filemanager">
+
+        <div class="btn-group" role="group" th:each="path : ${cloudFolder.getPath()}" aria-label="Basic example">
+            <form action="/dropbox/folder" method="get">
+                <input type="hidden" name="path" th:value="${path}"/>
+                <input type="submit" class="btn btn-secondary" th:value='${path.substring(path.lastIndexOf("/") + 1)}'/>
+            </form>
+        </div>
+
+        <div class="btn-group" role="group" aria-label="Basic example">
+            <input id="createNewFolder" type="submit" class="btn btn-secondary" value="New folder"/>
+            <input id="uploadFile" type="submit" class="btn btn-secondary" value="Upload file"/>
+        </div>
 
         <ul class="data" th:if="${!cloudFolder.getFolders().isEmpty() or !cloudFolder.getFiles().isEmpty()}">
             <li th:each="folder : ${cloudFolder.getFolders()}" class="folders context-menu-folder">
                 <a th:href="'/dropbox/folder?path=' + ${folder.getPath()}" th:title="${folder.getShowName()}"
                    class="folders">
                     <input type="hidden" name="documentLink" th:value="${folder.getPath()}"/>
-                    <span class="icon folder">     </span> <span class="name"><p
-                        th:text="${folder.getShowName()}"/></span>
+                    <span class="icon folder">     </span> <span class="name">
+                    <p th:text="${folder.getShowName()}"/></span>
                 </a>
             </li>
 
@@ -37,12 +55,45 @@
 
         </ul>
 
-
         <div class="nothingfound">
             <div class="nofiles"></div>
             <span>No files here.</span>
         </div>
 
+        <div style="display: none">
+
+            <div id="dialog-message-fail" title="Fail">
+                <p>
+                    <!--<span class="ui-icon ui-icon-circle-check" style="float:left; margin:0 7px 50px 0;"></span>-->
+                    Something wrong. Please, try again later.
+                </p>
+            </div>
+
+            <div id="dialog-message-ok" title="Complete">
+                <p>
+                    <!--<span class="ui-icon ui-icon-circle-check" style="float:left; margin:0 7px 50px 0;"></span>-->
+                    Success!
+                </p>
+            </div>
+
+            <div id="dialog-message-confirm-delete" title="Delete confirmation">
+                <p>
+                    <!--<span class="ui-icon ui-icon-alert" style="float:left; margin:12px 12px 20px 0;"></span>-->
+                    Are you sure to delete?
+                </p>
+            </div>
+
+            <div id="createNewFolderDialog" title="Create new folder">
+                <form>
+                    <fieldset>
+                        <label for="name">Folder name</label>
+                        <input type="text" name="name" id="name" class="text ui-widget-content ui-corner-all">
+                        <input type="submit" tabindex="-1" style="position:absolute; top:-1000px">
+                    </fieldset>
+                </form>
+            </div>
+
+        </div>
     </div>
 </div>
 <div th:replace="fragments/layout :: footer"></div>
@@ -54,6 +105,7 @@
 
 <!-- Include our script files -->
 <script src="../../../resources/js/jquery-1.11.0.min.js" th:src="@{/resources/js/jquery-1.11.0.min.js}"></script>
+<script src="../../../resources/js/jquery-ui.js" th:src="@{/resources/js/jquery-ui.js}"></script>
 <script src="../../../resources/js/context.js" th:src="@{/resources/js/context.js}"></script>
 <script src="../../../resources/js/file-explorer.js" th:src="@{/resources/js/file-explorer.js}"></script>
 

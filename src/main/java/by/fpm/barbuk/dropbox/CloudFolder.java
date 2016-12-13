@@ -10,7 +10,7 @@ import java.util.List;
 public class CloudFolder implements Serializable {
     private String showName;
     private String root;
-    private String path;
+    private List<String> path;
     private String size;
     private boolean isDir;
     private int bytes;
@@ -27,11 +27,11 @@ public class CloudFolder implements Serializable {
         this.root = root;
     }
 
-    public String getPath() {
+    public List<String> getPath() {
         return path;
     }
 
-    public void setPath(String path) {
+    public void setPath(List<String> path) {
         this.path = path;
     }
 

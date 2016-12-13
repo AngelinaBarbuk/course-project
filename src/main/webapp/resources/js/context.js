@@ -22,10 +22,6 @@ var context = context || (function () {
 
             $(document).on('click', 'html', function () {
                 $('.dropdown-context').fadeOut(options.fadeSpeed, function () {
-                    var x = document.getElementsByClassName("selected");
-                    for (var i = 0; i < x.length; i++) {
-                        x[i].classList.remove("selected");
-                    }
                     $('.dropdown-context').css({display: ''}).find('.drop-left').removeClass('drop-left');
                 });
             });
@@ -105,7 +101,10 @@ var context = context || (function () {
             $(document).on('contextmenu', selector, function (e) {
                 e.preventDefault();
                 e.stopPropagation();
-
+                var x = document.getElementsByClassName("selected");
+                for (var i = 0; i < x.length; i++) {
+                    x[i].classList.remove("selected");
+                }
                 if(e.target.tagName=='A'){
                     e.target.classList.add("selected");
                 }else if(e.target.parentNode.tagName=='A'){
