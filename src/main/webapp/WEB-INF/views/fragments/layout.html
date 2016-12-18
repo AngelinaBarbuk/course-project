@@ -29,6 +29,9 @@
                 <li th:classappend="${module == 'dropbox' ? 'active' : ''}">
                     <a href="#dropbox/" th:href="@{/dropbox}">Dropbox</a>
                 </li>
+                <li th:classappend="${module == 'google' ? 'active' : ''}">
+                    <a href="#google/" th:href="@{/google}">Google.Drive</a>
+                </li>
             </ul>
             <ul class="nav navbar-nav navbar-right">
                 <li th:if="${#authorization.expression('!isAuthenticated()')}">

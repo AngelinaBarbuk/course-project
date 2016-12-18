@@ -1,4 +1,4 @@
-package by.fpm.barbuk.dropbox;
+package by.fpm.barbuk.cloudEntities;
 
 import java.io.Serializable;
 

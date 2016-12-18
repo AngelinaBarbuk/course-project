@@ -6,6 +6,8 @@
 
     <link href="../../../resources/css/bootstrap.min.css" rel="stylesheet" media="screen"
           th:href="@{/resources/css/bootstrap.min.css}"/>
+    <link href="../../../resources/css/bootstrap.min.css" rel="stylesheet" media="screen"
+          th:href="@{/resources/css/bootstrap.min.css}"/>
     <link href="../../../resources/css/context.bootstrap.css" rel="stylesheet" media="screen"
           th:href="@{/resources/css/context.bootstrap.css}"/>
     <link href="../../../resources/css/context.standalone.css" rel="stylesheet" media="screen"
@@ -13,30 +15,36 @@
     <link href="../../../resources/css/jquery-ui.css" rel="stylesheet" media="screen"
           th:href="@{/resources/css/jquery-ui.css}"/>
     <link href="../../../resources/css/styles.css" rel="stylesheet" th:href="@{/resources/css/styles.css}"/>
-    <!--<script src="../../../resources/js/jquery-1.12.4.js" th:src="@{/resources/js/jquery-1.12.4.js}"></script>-->
 
 </head>
 <body>
 <div th:replace="fragments/layout :: header"></div>
 <div class="container">
 
+    <input type="hidden" id="cloudStorage" th:value="${cloudFolder.getCloudStorage()}">
+
     <div class="filemanager">
 
         <div class="btn-group" role="group" th:each="path : ${cloudFolder.getPath()}" aria-label="Basic example">
-            <form action="/dropbox/folder" method="get">
-                <input type="hidden" name="path" th:value="${path}"/>
-                <input type="submit" class="btn btn-secondary" th:value='${path.substring(path.lastIndexOf("/") + 1)}'/>
+            <form th:action="${cloudFolder.getCloudStorage()}+'/folder'" method="get">
+                <input type="hidden" name="path" th:value="${path.getKey()}"/>
+                <input type="submit" class="btn btn-secondary" th:value='${path.getValue()}'/>
             </form>
         </div>
 
         <div class="btn-group" role="group" aria-label="Basic example">
             <input id="createNewFolder" type="submit" class="btn btn-secondary" value="New folder"/>
-            <input id="uploadFile" type="submit" class="btn btn-secondary" value="Upload file"/>
+            <form id="uploadFileForm" method="POST" th:action="${cloudFolder.getCloudStorage()}+'/uploadFile'" enctype="multipart/form-data">
+                <!--<input type="file" name="file">-->
+                <input id="uploadFilePath" type="hidden" name="path" th:value="${cloudFolder.getCurrentPath()}"/>
+                <input id="uploadFile" type="file" name="file" class="filestyle" data-input="false" />
+            </form>
+
         </div>
 
         <ul class="data" th:if="${!cloudFolder.getFolders().isEmpty() or !cloudFolder.getFiles().isEmpty()}">
             <li th:each="folder : ${cloudFolder.getFolders()}" class="folders context-menu-folder">
-                <a th:href="'/dropbox/folder?path=' + ${folder.getPath()}" th:title="${folder.getShowName()}"
+                <a th:href="${cloudFolder.getCloudStorage()}+'/folder?path=' + ${folder.getPath()}" th:title="${folder.getShowName()}"
                    class="folders">
                     <input type="hidden" name="documentLink" th:value="${folder.getPath()}"/>
                     <span class="icon folder">     </span> <span class="name">
@@ -45,7 +53,7 @@
             </li>
 
             <li th:each="file : ${cloudFolder.getFiles()}" class="files context-menu-file">
-                <a th:href="'/dropbox/download?path=' + ${file.getPath()}" th:title="${file.getShowName()}"
+                <a th:href="${cloudFolder.getCloudStorage()}+'/download?path=' + ${file.getPath()}" th:title="${file.getShowName()}"
                    class="files">
                     <input type="hidden" name="documentLink" th:value="${file.getPath()}"/>
                     <span th:class="'icon file f-' + ${file.getFileType()}"><p th:text="${file.getFileType()}"/></span>

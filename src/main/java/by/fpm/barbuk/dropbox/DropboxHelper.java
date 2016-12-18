@@ -1,19 +1,22 @@
-package by.fpm.barbuk.oauth;
+package by.fpm.barbuk.dropbox;
 
-import by.fpm.barbuk.dropbox.CloudFile;
-import by.fpm.barbuk.dropbox.CloudFolder;
-import by.fpm.barbuk.dropbox.DropboxUser;
+import by.fpm.barbuk.cloudEntities.CloudFile;
+import by.fpm.barbuk.cloudEntities.CloudFolder;
+import com.sun.org.apache.xml.internal.security.utils.Base64;
 import com.temboo.Library.Dropbox.FileOperations.CreateFolder;
 import com.temboo.Library.Dropbox.FileOperations.DeleteFileOrFolder;
 import com.temboo.Library.Dropbox.FilesAndMetadata.GetDownloadLink;
 import com.temboo.Library.Dropbox.FilesAndMetadata.ListFolderContents;
+import com.temboo.Library.Dropbox.FilesAndMetadata.UploadFile;
 import com.temboo.Library.Dropbox.OAuth.FinalizeOAuth;
 import com.temboo.Library.Dropbox.OAuth.InitializeOAuth;
 import com.temboo.core.TembooException;
 import com.temboo.core.TembooSession;
+import javafx.util.Pair;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -22,7 +25,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 
-public final class DropboxAuthHelper {
+public final class DropboxHelper {
 
     // Provide your dropbox App ID and App Secret.
     private static final String APP_ID = "mvfavfx9yg4ts62";
@@ -43,7 +46,7 @@ public final class DropboxAuthHelper {
     private String tokenSecret = "";
     private String callbackID = "";
 
-    public DropboxAuthHelper() {
+    public DropboxHelper() {
 
         generateStateToken();
         try {
@@ -121,19 +124,19 @@ public final class DropboxAuthHelper {
             JSONObject result = new JSONObject(listFolderContentsResults.get_Response());
             CloudFolder cloudFolder = new CloudFolder();
 
-            List<String> folderPathList = new ArrayList<>();
+            List<Pair<String,String>> folderPathList = new ArrayList<>();
             String[] folderPath = result.getString("path").split("/");
-            if(folderPath.length>=2) {
-                folderPathList.add("root");
+            if (folderPath.length >= 2) {
+                folderPathList.add(new Pair("root","root"));
             }
             for (int i = 2; i < folderPath.length; i++) {
                 StringBuffer sb = new StringBuffer();
                 for (int j = 1; j < i; j++)
                     sb.append("/" + folderPath[j]);
-                folderPathList.add(sb.toString());
+                folderPathList.add(new Pair(sb.toString(),folderPath[i-1]));
             }
             cloudFolder.setPath(folderPathList);
-
+            cloudFolder.setCurrentPath(result.getString("path"));
             cloudFolder.setShowName(result.getString("path").substring(cloudFolder.getPath().lastIndexOf("/") + 1));
 //            cloudFolder.setPath(new String(result.getString("path").getBytes("windows-1251"), "UTF-8"));
             cloudFolder.setSize(result.getString("size"));
@@ -185,22 +188,6 @@ public final class DropboxAuthHelper {
 
         GetDownloadLink.GetDownloadLinkResultSet getDownloadLinkResults = getDownloadLinkChoreo.execute(getDownloadLinkInputs);
         return getDownloadLinkResults.get_URL();
-
-/*        GetShareableLink getShareableLinkChoreo = new GetShareableLink(session);
-
-// Get an InputSet object for the choreo
-        GetShareableLink.GetShareableLinkInputSet getShareableLinkInputs = getShareableLinkChoreo.newInputSet();
-
-        getShareableLinkInputs.set_AppKey(APP_ID);
-        getShareableLinkInputs.set_AppSecret(APP_SECRET);
-        getShareableLinkInputs.set_AccessToken(user.getAccessToken());
-        getShareableLinkInputs.set_AccessTokenSecret(user.getAccessSecret());
-        getShareableLinkInputs.set_Path(path);
-
-
-// Execute Choreo
-        GetShareableLink.GetShareableLinkResultSet getShareableLinkResults = getShareableLinkChoreo.execute(getShareableLinkInputs);
-        return getShareableLinkResults.get_Response();*/
     }
 
     public boolean delete(String path, DropboxUser user) throws TembooException, JSONException {
@@ -231,8 +218,23 @@ public final class DropboxAuthHelper {
 
         CreateFolder.CreateFolderResultSet createFolderResults = createFolderChoreo.execute(createFolderInputs);
         return true;
+    }
 
+    public boolean uploadFile(MultipartFile file, String path, DropboxUser user) throws TembooException, IOException {
+        UploadFile uploadFileChoreo = new UploadFile(session);
+        UploadFile.UploadFileInputSet uploadFileInputs = uploadFileChoreo.newInputSet();
 
+        uploadFileInputs.set_AppKey(APP_ID);
+        uploadFileInputs.set_AppSecret(APP_SECRET);
+        uploadFileInputs.set_AccessToken(user.getAccessToken());
+        uploadFileInputs.set_AccessTokenSecret(user.getAccessSecret());
+        uploadFileInputs.set_Folder("root".equals(path) ? "" : path);
+        String base64 = Base64.encode(file.getBytes());
+        uploadFileInputs.set_FileContents(base64);
+        uploadFileInputs.set_FileName(file.getOriginalFilename());
+
+        UploadFile.UploadFileResultSet uploadFileResults = uploadFileChoreo.execute(uploadFileInputs);
+        return true;
     }
 
 }

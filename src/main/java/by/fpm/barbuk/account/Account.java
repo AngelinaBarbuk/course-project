@@ -1,6 +1,7 @@
 package by.fpm.barbuk.account;
 
 import by.fpm.barbuk.dropbox.DropboxUser;
+import by.fpm.barbuk.google.drive.GoogleUser;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import javax.persistence.*;
@@ -27,6 +28,9 @@ public class Account implements java.io.Serializable {
 
     @Column(name = "dropbox_user", columnDefinition = "LONGVARBINARY")
     private DropboxUser dropboxUser;
+
+    @Column(name = "google_user", columnDefinition = "LONGVARBINARY")
+    private GoogleUser googleUser;
 
     protected Account() {
 
@@ -77,5 +81,13 @@ public class Account implements java.io.Serializable {
 
     public void setDropboxUser(DropboxUser dropboxUser) {
         this.dropboxUser = dropboxUser;
+    }
+
+    public GoogleUser getGoogleUser() {
+        return googleUser;
+    }
+
+    public void setGoogleUser(GoogleUser googleUser) {
+        this.googleUser = googleUser;
     }
 }

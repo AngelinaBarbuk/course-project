@@ -66,14 +66,9 @@ public class AccountService implements UserDetailsService {
     }
 
     @Transactional
-    public void updateDropboxUser(Account account) {
-//        em.persist(account);
-
+    public void updateUsers(Account account) {
         em.merge(account);
         em.flush();
-//        em.getTransaction().begin();
-//        em.merge(account);
-//        em.getTransaction().commit();
     }
 
     public void signin(Account account) {

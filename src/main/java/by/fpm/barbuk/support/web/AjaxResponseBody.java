@@ -1,6 +1,6 @@
 package by.fpm.barbuk.support.web;
 
-import by.fpm.barbuk.dropbox.CloudFile;
+import by.fpm.barbuk.cloudEntities.CloudFile;
 
 import java.io.Serializable;
 import java.util.List;

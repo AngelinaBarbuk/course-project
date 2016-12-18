@@ -1,4 +1,5 @@
 $(function () {
+    var cloudStorage=document.getElementById("cloudStorage").value;
     $("#dialog-message-ok").dialog({
         modal: true,
         autoOpen: false,
@@ -31,7 +32,7 @@ $(function () {
                 var x = document.getElementsByClassName("selected");
                 var p = x[0].getElementsByTagName("input")[0].value;
                 $.ajax({
-                    url: '/dropbox/delete?path=' + p,
+                    url: cloudStorage+'/delete?path=' + p,
                     type: 'DELETE',
                     success: function (result) {
                         $("#dialog-message-ok").dialog('open');
@@ -58,11 +59,18 @@ $(function () {
             Create: function (button) {
                 $(this).dialog("close");
                 var name = $("#name");
+                var data;
+                if(cloudStorage=='/dropbox'){
+                    data = {"path": (urlParam('path') + '/' + name.val())};
+                }else if(cloudStorage=='/google'){
+                    data={"path": (urlParam('path')),
+                    "folderName":name.val()}
+                }
 
                 $.ajax({
-                    url: '/dropbox/createFolder',
+                    url: cloudStorage+'/createFolder',
                     type: 'POST',
-                    data: {"path": (urlParam('path') + '/' + name.val())},
+                    data: data,
                     success: function (result) {
                         $("#dialog-message-ok").dialog('open');
                         location.reload();
@@ -81,6 +89,8 @@ $(function () {
     var filemanager = $('.filemanager'),
         breadcrumbs = $('.breadcrumbs'),
         fileList = filemanager.find('.data');
+    
+
 
     if (!fileList.length) {
         filemanager.find('.nothingfound').show();
@@ -139,6 +149,11 @@ $(function () {
     $("#createNewFolder").click(function (e) {
         $("#createNewFolderDialog").dialog('open');
     });
+
+    $("#uploadFile").change(function () {
+        $("#uploadFileForm").submit();
+    });
+
 
 })
 
