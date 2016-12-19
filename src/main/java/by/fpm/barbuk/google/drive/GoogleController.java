@@ -2,7 +2,10 @@ package by.fpm.barbuk.google.drive;
 
 import by.fpm.barbuk.account.Account;
 import by.fpm.barbuk.account.AccountService;
+import by.fpm.barbuk.cloudEntities.CloudFile;
 import by.fpm.barbuk.cloudEntities.CloudFolder;
+import by.fpm.barbuk.cloudEntities.FolderList;
+import by.fpm.barbuk.dropbox.DropboxUser;
 import by.fpm.barbuk.support.web.AjaxRequestBody;
 import by.fpm.barbuk.support.web.AjaxResponseBody;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -22,6 +25,8 @@ import org.springframework.web.servlet.ModelAndView;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.nio.channels.FileLock;
+import java.util.List;
 
 /**
  * Created by B on 02.12.2016.
@@ -63,6 +68,15 @@ public class GoogleController {
         modelAndView.addObject("cloudFolder", result);
         modelAndView.setViewName("file-explorer/file-explorer");
         return modelAndView;
+    }
+
+    @RequestMapping(value = "/google/getFolders", method = RequestMethod.GET)
+    @Secured({"ROLE_USER", "ROLE_ADMIN"})
+    @ResponseBody
+    public FolderList dropboxGetFolders(@RequestParam(name = "path") String path) throws JSONException, TembooException, IOException {
+        GoogleUser googleUser = getAccount().getGoogleUser();
+        FolderList result = googleHelper.getFolders(path, googleUser);
+        return result;
     }
 
     @RequestMapping(value = "/google/download", method = RequestMethod.GET)

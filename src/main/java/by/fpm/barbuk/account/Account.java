@@ -5,7 +5,10 @@ import by.fpm.barbuk.google.drive.GoogleUser;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import javax.persistence.*;
+import java.security.PrivateKey;
 import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
 
 @SuppressWarnings("serial")
 @Entity
@@ -31,6 +34,7 @@ public class Account implements java.io.Serializable {
 
     @Column(name = "google_user", columnDefinition = "LONGVARBINARY")
     private GoogleUser googleUser;
+
 
     protected Account() {
 

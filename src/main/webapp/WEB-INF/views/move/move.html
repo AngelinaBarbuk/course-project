@@ -2,7 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <head lang="en">
     <meta charset="UTF-8">
-    <title>Cloud</title>>
+    <title>Move files</title>
 
     <link href="../../../resources/css/bootstrap.min.css" rel="stylesheet" media="screen"
           th:href="@{/resources/css/bootstrap.min.css}"/>
@@ -20,6 +20,8 @@
 <body>
 <div th:replace="fragments/layout :: header"></div>
 <div class="container">
+
+
 
     <input type="hidden" id="cloudStorage" th:value="${cloudFolder.getCloudStorage()}">
 
@@ -96,17 +98,6 @@
                         <input type="submit" tabindex="-1" style="position:absolute; top:-1000px">
                     </fieldset>
                 </form>
-            </div>
-
-            <div id="moveDialog" title="Move file">
-                <input type="button" id="upBtn" name="moveDialogOpenFolderBtn" style="display: none;" class="btn btn-default" value="Up" />
-                <table id="moveDialogList" class="table"></table>
-            </div>
-
-            <div id="dialog-message-crypto" title="Encrypt confirmation">
-                <p>
-                    Do you want to encrypt file?
-                </p>
             </div>
 
         </div>

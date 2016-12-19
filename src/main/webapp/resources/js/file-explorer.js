@@ -1,5 +1,5 @@
 $(function () {
-    var cloudStorage=document.getElementById("cloudStorage").value;
+    var cloudStorage = document.getElementById("cloudStorage").value;
     $("#dialog-message-ok").dialog({
         modal: true,
         autoOpen: false,
@@ -32,7 +32,7 @@ $(function () {
                 var x = document.getElementsByClassName("selected");
                 var p = x[0].getElementsByTagName("input")[0].value;
                 $.ajax({
-                    url: cloudStorage+'/delete?path=' + p,
+                    url: cloudStorage + '/delete?path=' + p,
                     type: 'DELETE',
                     success: function (result) {
                         $("#dialog-message-ok").dialog('open');
@@ -60,15 +60,17 @@ $(function () {
                 $(this).dialog("close");
                 var name = $("#name");
                 var data;
-                if(cloudStorage=='/dropbox'){
+                if (cloudStorage == '/dropbox') {
                     data = {"path": (urlParam('path') + '/' + name.val())};
-                }else if(cloudStorage=='/google'){
-                    data={"path": (urlParam('path')),
-                    "folderName":name.val()}
+                } else if (cloudStorage == '/google') {
+                    data = {
+                        "path": (urlParam('path')),
+                        "folderName": name.val()
+                    }
                 }
 
                 $.ajax({
-                    url: cloudStorage+'/createFolder',
+                    url: cloudStorage + '/createFolder',
                     type: 'POST',
                     data: data,
                     success: function (result) {
@@ -86,10 +88,22 @@ $(function () {
         }
     });
 
+    $("#moveDialog").dialog({
+        resizable: false,
+        height: "auto",
+        width: 400,
+        modal: true,
+        autoOpen: false,
+        buttons: {
+            Cancel: function (button) {
+                $(this).dialog("close");
+            },
+        }
+    });
+
     var filemanager = $('.filemanager'),
         breadcrumbs = $('.breadcrumbs'),
         fileList = filemanager.find('.data');
-    
 
 
     if (!fileList.length) {
@@ -143,7 +157,63 @@ $(function () {
         }
         },
         {divider: true},
-        {text: 'Move', href: '#'}
+        {
+            text: 'Move', action: function (e) {
+            var x = document.getElementsByClassName("selected");
+            var p = x[0].getElementsByTagName("input")[0].value;
+            if (p) {
+                var url;
+                if (cloudStorage == '/dropbox') {
+                    url = "/google";
+                } else if (cloudStorage == '/google') {
+                    url = "/dropbox";
+                }
+                $.ajax({
+                    url: url + '/getFolders?path=root',
+                    type: 'GET',
+                    success: function (result) {
+                        var folders = result['folders'];
+                        var x = document.getElementById("moveDialogList");
+                        x.innerHTML = '';
+                        for (var i = 0; i < folders.length; i++) {
+                            var cloudFile = folders[i];
+                            var folder = $('<tr class="row">' +
+                                '<td>' + cloudFile['showName'] + '</td>' +
+                                '<td><input type="button" name="moveDialogOpenFolderBtn" href="' + '/getFolders?path=' + cloudFile['path'] + '" class="btn btn-default" value="Open folder"/></td>' +
+                                '<td><input type="button" name="moveDialogSelectFolderBtn" href="' + cloudFile['path'] + '" class="btn btn-default" value="Select folder"/></td>' +
+                                '</tr>');
+                            folder.appendTo(x);
+                        }
+                        $("#moveDialog").dialog('open');
+                        /*$("#dialog-message-ok").dialog('open');
+                         location.reload();*/
+                    },
+                    fail: function (result) {
+                        $("#dialog-message-fail").dialog('open');
+                    }
+                });
+            }
+        }
+        },
+        {
+            text: 'Encrypt', action: function (e) {
+            var x = document.getElementsByClassName("selected");
+            var p = x[0].getElementsByTagName("input")[0].value;
+            if (p) {
+                    $.ajax({
+                        url: cloudStorage + '/encrypt?path='+p,
+                        type: 'GET',
+                        success: function (result) {
+                            $("#dialog-message-ok").dialog('open');
+                             location.reload();
+                        },
+                        fail: function (result) {
+                            $("#dialog-message-fail").dialog('open');
+                        }
+                    });
+                }
+            }
+        }
     ]);
 
     $("#createNewFolder").click(function (e) {
@@ -152,6 +222,85 @@ $(function () {
 
     $("#uploadFile").change(function () {
         $("#uploadFileForm").submit();
+    });
+
+    $('#moveDialog').on('click', 'input[name="moveDialogOpenFolderBtn"]', function (e) {
+        var x = document.getElementsByClassName("selected");
+        var p = x[0].getElementsByTagName("input")[0].value;
+        if (p) {
+            var path = e.target.getAttribute("href");
+            var url;
+            if (cloudStorage == '/dropbox') {
+                url = "/google";
+            } else if (cloudStorage == '/google') {
+                url = "/dropbox";
+            }
+
+            $.ajax({
+                url: url + path,
+                type: 'GET',
+                success: function (result) {
+                    var folders = result['folders'];
+                    var prev = result['prevFolder'];
+                    var prevBtn = document.getElementById("upBtn");
+                    if (prev != '') {
+                        prevBtn.removeAttribute("style");
+                        prevBtn.setAttribute("href", '/getFolders?path=' + prev);
+                    } else {
+                        prevBtn.setAttribute("style", "display: none;");
+                    }
+
+                    var x = document.getElementById("moveDialogList");
+                    x.innerHTML = '';
+                    for (var i = 0; i < folders.length; i++) {
+                        var cloudFile = folders[i];
+                        var folder = $('<tr class="row">' +
+                            '<td>' + cloudFile['showName'] + '</td>' +
+                            '<td><input type="button" name="moveDialogOpenFolderBtn" href="' + '/getFolders?path=' + cloudFile['path'] + '" class="btn btn-default" value="Open folder"/></td>' +
+                            '<td><input type="button" name="moveDialogSelectFolderBtn" href="' + cloudFile['path'] + '" class="btn btn-default" value="Select folder"/></td>' +
+                            '</tr>');
+                        folder.appendTo(x);
+                    }
+                    $("#moveDialog").dialog('open');
+                },
+                fail: function (result) {
+                    $("#dialog-message-fail").dialog('open');
+                }
+            });
+
+        }
+    });
+
+
+    $('#moveDialog').on('click', 'input[name="moveDialogSelectFolderBtn"]', function (e) {
+        $("#moveDialog").dialog('close');
+        var x = document.getElementsByClassName("selected");
+        var p = x[0].getElementsByTagName("input")[0].value;
+        if (p) {
+            var path = e.target.getAttribute("href");
+            var url;
+            if (cloudStorage == '/dropbox') {
+                url = "/dropbox_to_google";
+            } else if (cloudStorage == '/google') {
+                url = "/google_to_dropbox";
+            }
+            var data = {
+                "fileToMove": p,
+                "pathToMove": path
+            };
+            $.ajax({
+                url: url,
+                type: 'POST',
+                data: data,
+                success: function (result) {
+                    $("#dialog-message-ok").dialog('open');
+                },
+                fail: function (result) {
+                    $("#dialog-message-fail").dialog('open');
+                }
+            });
+
+        }
     });
 
 
