@@ -1,26 +1,26 @@
 package by.fpm.barbuk.google.drive;
 
+import by.fpm.barbuk.account.Account;
 import by.fpm.barbuk.cloudEntities.CloudFile;
 import by.fpm.barbuk.cloudEntities.CloudFolder;
 import by.fpm.barbuk.cloudEntities.FolderList;
+import by.fpm.barbuk.temboo.CloudHelper;
+import by.fpm.barbuk.temboo.TembooHelper;
 import com.sun.org.apache.xml.internal.security.utils.Base64;
-import com.temboo.Library.FilesAnywhere.DownloadBase64EncodedFile;
 import com.temboo.Library.Google.Drive.Files.Delete;
 import com.temboo.Library.Google.Drive.Files.Get;
 import com.temboo.Library.Google.Drive.Files.Insert;
 import com.temboo.Library.Google.OAuth.FinalizeOAuth;
 import com.temboo.Library.Google.OAuth.InitializeOAuth;
 import com.temboo.core.TembooException;
-import com.temboo.core.TembooSession;
 import javafx.util.Pair;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.*;
-import java.net.MalformedURLException;
-import java.net.URL;
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -28,43 +28,18 @@ import java.util.List;
 import java.util.Map;
 
 
-public final class GoogleHelper {
+public final class GoogleHelper extends TembooHelper implements CloudHelper {
 
+    public static final String MIME_TYPE_FOLDER = "application/vnd.google-apps.folder";
     // Provide your dropbox App ID and App Secret.
     private static final String APP_ID = "mvfavfx9yg4ts62";
     private static final String APP_SECRET = "2g8wfrnbdpuc1of";
-
     // Callback URI that Temboo will redirect to after successful authentication.
     private static final String FORWARDING_URL = "http://localhost:8080/google/OAuthLogIn";
-
     private static final String CLIENT_ID = "569486570902-vrcv37j4msm28ucb22024aseesf8s4is.apps.googleusercontent.com";
     private static final String SCOPE = "https://www.googleapis.com/auth/drive";
     private static final String CLIENT_SECRET = "giRKgPH6v0eCPMDIEhrcKVBh";
-    public static final String MIME_TYPE_FOLDER = "application/vnd.google-apps.folder";
-
-    private String stateToken;
-
-    // Replace with your Temboo credentials.
-    private static final String TEMBOO_ACCOUNT_NAME = "angelinabarbuk";
-    private static final String TEMBOO_APP_KEY_NAME = "myFirstApp";
-    private static final String TEMBOO_APP_KEY_VALUE = "dz7TFlG60iXUQhhBkR4bBZ7jMQyK7U0A";
-
     private static Map<String, String> folders = new HashMap<>();
-
-    private TembooSession session = null;
-
-    private String tokenSecret = "";
-    private String callbackID = "";
-
-    public GoogleHelper() {
-
-        generateStateToken();
-        try {
-            session = new TembooSession(TEMBOO_ACCOUNT_NAME, TEMBOO_APP_KEY_NAME, TEMBOO_APP_KEY_VALUE);
-        } catch (Exception te) {
-            te.printStackTrace();
-        }
-    }
 
     public String getLoginUrl() {
         String authURL = "";
@@ -143,7 +118,8 @@ public final class GoogleHelper {
         return pairs;
     }
 
-    public CloudFolder getFolderContent(String path, GoogleUser user) throws TembooException, JSONException, UnsupportedEncodingException {
+    public CloudFolder getFolderContent(String path, Account account) throws TembooException, JSONException, UnsupportedEncodingException {
+        GoogleUser user = account.getGoogleUser();
         com.temboo.Library.Google.Drive.Files.List filesListChoreo = new com.temboo.Library.Google.Drive.Files.List(session);
         com.temboo.Library.Google.Drive.Files.List.ListInputSet filesListInputs = filesListChoreo.newInputSet();
 
@@ -191,7 +167,8 @@ public final class GoogleHelper {
         return new CloudFolder();
     }
 
-    public FolderList getFolders(String path, GoogleUser user) throws TembooException, JSONException, UnsupportedEncodingException {
+    public FolderList getFolders(String path, Account account) throws TembooException, JSONException, UnsupportedEncodingException {
+        GoogleUser user = account.getGoogleUser();
         FolderList folderList = new FolderList();
         com.temboo.Library.Google.Drive.Files.List filesListChoreo = new com.temboo.Library.Google.Drive.Files.List(session);
         com.temboo.Library.Google.Drive.Files.List.ListInputSet filesListInputs = filesListChoreo.newInputSet();
@@ -201,7 +178,7 @@ public final class GoogleHelper {
         filesListInputs.set_AccessToken(user.getAccessToken());
         filesListInputs.setInput("corpus", "domain");
         filesListInputs.set_MaxResults(1000);
-        filesListInputs.set_Query("'" + path + "' in parents and mimeType = '" + MIME_TYPE_FOLDER+"'");
+        filesListInputs.set_Query("'" + path + "' in parents and mimeType = '" + MIME_TYPE_FOLDER + "'");
         try {
             com.temboo.Library.Google.Drive.Files.List.ListResultSet filesListResults = filesListChoreo.execute(filesListInputs);
             if (filesListResults.getException() == null) {
@@ -218,21 +195,21 @@ public final class GoogleHelper {
                     this.folders.put(cloudFile.getPath(), cloudFile.getShowName());
                 }
                 folderList.setFolders(folders);
-                List<Pair<String, String>> pairs = getParents(path,user);
-                if(pairs.isEmpty())
+                List<Pair<String, String>> pairs = getParents(path, user);
+                if (pairs.isEmpty())
                     folderList.setPrevFolder("");
                 else
-                    folderList.setPrevFolder(pairs.get(pairs.size()-1).getKey());
+                    folderList.setPrevFolder(pairs.get(pairs.size() - 1).getKey());
                 return folderList;
             }
-        }catch (TembooException ex){
+        } catch (TembooException ex) {
             System.out.println("empty");
         }
         return folderList;
     }
 
-    public String getDownloadFileLink(String path, GoogleUser user) throws TembooException, JSONException {
-
+    public String getDownloadFileLink(String path, Account account) throws TembooException, JSONException {
+        GoogleUser user = account.getGoogleUser();
         Get getChoreo = new Get(session);
         Get.GetInputSet getInputs = getChoreo.newInputSet();
 
@@ -251,24 +228,8 @@ public final class GoogleHelper {
         return result.getString("webContentLink");
     }
 
-    /*public String downloadFile(String path, GoogleUser user) throws TembooException, JSONException, IOException {
-        MultipartFile file =
-        String urlStr = getDownloadFileLink(path,user);
-        URL url = new URL(urlStr);
-        BufferedInputStream bis = new BufferedInputStream(url.openStream());
-
-        byte[] buffer = new byte[1024];
-        int count=0;
-        StringBuffer base64 = new StringBuffer();
-        while((count = bis.read(buffer,0,1024)) != -1)
-        {
-            base64.append(Base64.encode(buffer));
-        }
-        bis.close();
-        return base64.toString();
-    }*/
-
-    public boolean delete(String path, GoogleUser user) throws TembooException, JSONException {
+    public boolean delete(String path, Account account) throws TembooException, JSONException {
+        GoogleUser user = account.getGoogleUser();
         Delete deleteChoreo = new Delete(session);
         Delete.DeleteInputSet deleteInputs = deleteChoreo.newInputSet();
 
@@ -282,8 +243,8 @@ public final class GoogleHelper {
         return "SUCCESS".equals(deleteResults.getCompletionStatus());
     }
 
-    public boolean createFolder(String path, String folderName, GoogleUser user) throws TembooException, JSONException {
-
+    public boolean createFolder(String path, String folderName, Account account) throws TembooException, JSONException {
+        GoogleUser user = account.getGoogleUser();
         Insert insertChoreo = new Insert(session);
         Insert.InsertInputSet insertInputs = insertChoreo.newInputSet();
 
@@ -305,7 +266,8 @@ public final class GoogleHelper {
 
     }
 
-    public boolean uploadFile(MultipartFile file, String path, GoogleUser user) throws TembooException, IOException, JSONException {
+    public boolean uploadFile(MultipartFile file, String path, Account account) throws TembooException, IOException, JSONException {
+        GoogleUser user = account.getGoogleUser();
         Insert insertChoreo = new Insert(session);
         Insert.InsertInputSet insertInputs = insertChoreo.newInputSet();
 
@@ -323,14 +285,14 @@ public final class GoogleHelper {
         insertInputs.set_RequestBody(object.toString());
         String base64 = Base64.encode(file.getBytes());
         insertInputs.set_FileContent(base64);
-        if(file.getContentType()!=null)
+        if (file.getContentType() != null)
             insertInputs.set_ContentType(file.getContentType());
         else
             insertInputs.set_ContentType("text/plain");
         try {
             Insert.InsertResultSet insertResults = insertChoreo.execute(insertInputs);
             return "SUCCESS".equals(insertResults.getCompletionStatus());
-        }catch (Exception ex){
+        } catch (Exception ex) {
             System.out.println("err");
         }
         return true;

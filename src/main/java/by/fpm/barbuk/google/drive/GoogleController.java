@@ -2,10 +2,8 @@ package by.fpm.barbuk.google.drive;
 
 import by.fpm.barbuk.account.Account;
 import by.fpm.barbuk.account.AccountService;
-import by.fpm.barbuk.cloudEntities.CloudFile;
 import by.fpm.barbuk.cloudEntities.CloudFolder;
 import by.fpm.barbuk.cloudEntities.FolderList;
-import by.fpm.barbuk.dropbox.DropboxUser;
 import by.fpm.barbuk.support.web.AjaxRequestBody;
 import by.fpm.barbuk.support.web.AjaxResponseBody;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -25,8 +23,6 @@ import org.springframework.web.servlet.ModelAndView;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
-import java.nio.channels.FileLock;
-import java.util.List;
 
 /**
  * Created by B on 02.12.2016.
@@ -50,8 +46,7 @@ public class GoogleController {
     @ResponseBody
     String googleAjax(@RequestBody AjaxRequestBody requestBody) throws JSONException, TembooException, JsonProcessingException, UnsupportedEncodingException {
         if (requestBody.getRequestType().equals("Open_Dir")) {
-            GoogleUser googleUser = getAccount().getGoogleUser();
-            CloudFolder result = googleHelper.getFolderContent(requestBody.getPath(), googleUser);
+            CloudFolder result = googleHelper.getFolderContent(requestBody.getPath(), getAccount());
             return mapper.writeValueAsString(result);
         }
         return mapper.writeValueAsString(new AjaxResponseBody());
@@ -61,8 +56,7 @@ public class GoogleController {
     @Secured({"ROLE_USER", "ROLE_ADMIN"})
     @ResponseStatus(HttpStatus.OK)
     public ModelAndView googlePath(@RequestParam(name = "path") String path) throws JSONException, TembooException, JsonProcessingException, UnsupportedEncodingException {
-        GoogleUser googleUser = getAccount().getGoogleUser();
-        CloudFolder result = googleHelper.getFolderContent(path, googleUser);
+        CloudFolder result = googleHelper.getFolderContent(path, getAccount());
         result.setCloudStorage("/google");
         ModelAndView modelAndView = new ModelAndView();
         modelAndView.addObject("cloudFolder", result);
@@ -74,16 +68,14 @@ public class GoogleController {
     @Secured({"ROLE_USER", "ROLE_ADMIN"})
     @ResponseBody
     public FolderList dropboxGetFolders(@RequestParam(name = "path") String path) throws JSONException, TembooException, IOException {
-        GoogleUser googleUser = getAccount().getGoogleUser();
-        FolderList result = googleHelper.getFolders(path, googleUser);
+        FolderList result = googleHelper.getFolders(path, getAccount());
         return result;
     }
 
     @RequestMapping(value = "/google/download", method = RequestMethod.GET)
     @Secured({"ROLE_USER", "ROLE_ADMIN"})
     public String googleDownload(@RequestParam(name = "path") String path) throws JSONException, TembooException, IOException {
-        GoogleUser googleUser = getAccount().getGoogleUser();
-        String result = googleHelper.getDownloadFileLink(path, googleUser);
+        String result = googleHelper.getDownloadFileLink(path, getAccount());
         return "redirect:" + result;
     }
 
@@ -91,8 +83,7 @@ public class GoogleController {
     @Secured({"ROLE_USER", "ROLE_ADMIN"})
     @ResponseBody
     public String googleDelete(@RequestParam(name = "path") String path) throws JSONException, TembooException, IOException {
-        GoogleUser googleUser = getAccount().getGoogleUser();
-        boolean result = googleHelper.delete(path, googleUser);
+        boolean result = googleHelper.delete(path, getAccount());
         return "success";
     }
 
@@ -100,17 +91,15 @@ public class GoogleController {
     @Secured({"ROLE_USER", "ROLE_ADMIN"})
     @ResponseBody
     public String googleCreateFolder(@RequestParam(name = "path") String path, @RequestParam(name = "folderName") String folderName) throws JSONException, TembooException, IOException {
-        GoogleUser googleUser = getAccount().getGoogleUser();
-        boolean result = googleHelper.createFolder(path,folderName, googleUser);
+        boolean result = googleHelper.createFolder(path, folderName, getAccount());
         return "success";
     }
 
     @RequestMapping(value = "/google/uploadFile", method = RequestMethod.POST)
     @Secured({"ROLE_USER", "ROLE_ADMIN"})
     public String googleUploadFile(@RequestParam(name = "path") String path, @RequestParam("file") MultipartFile file) throws JSONException, TembooException, IOException {
-        GoogleUser googleUser = getAccount().getGoogleUser();
-        boolean result = googleHelper.uploadFile(file, path, googleUser);
-        return "redirect:/google/folder?path="+path;
+        boolean result = googleHelper.uploadFile(file, path, getAccount());
+        return "redirect:/google/folder?path=" + path;
     }
 
     private Account getAccount() {

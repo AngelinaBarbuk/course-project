@@ -2,13 +2,11 @@ package by.fpm.barbuk.account;
 
 import by.fpm.barbuk.dropbox.DropboxUser;
 import by.fpm.barbuk.google.drive.GoogleUser;
+import by.fpm.barbuk.uploadBigFile.UserFiles;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import javax.persistence.*;
-import java.security.PrivateKey;
 import java.time.Instant;
-import java.util.HashMap;
-import java.util.Map;
 
 @SuppressWarnings("serial")
 @Entity
@@ -35,6 +33,8 @@ public class Account implements java.io.Serializable {
     @Column(name = "google_user", columnDefinition = "LONGVARBINARY")
     private GoogleUser googleUser;
 
+    @Column(name = "user_files", columnDefinition = "LONGVARBINARY")
+    private UserFiles userBigFiles = new UserFiles();
 
     protected Account() {
 
@@ -93,5 +93,13 @@ public class Account implements java.io.Serializable {
 
     public void setGoogleUser(GoogleUser googleUser) {
         this.googleUser = googleUser;
+    }
+
+    public UserFiles getUserBigFiles() {
+        return userBigFiles;
+    }
+
+    public void setUserBigFiles(UserFiles userBigFiles) {
+        this.userBigFiles = userBigFiles;
     }
 }

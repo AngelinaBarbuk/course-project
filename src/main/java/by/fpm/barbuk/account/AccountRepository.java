@@ -8,8 +8,8 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface AccountRepository extends JpaRepository<Account, Long> {
 
-	Account findOneByEmail(String email);
+    Account findOneByEmail(String email);
 
-	@Query("select count(a) > 0 from Account a where a.email = :email")
-	boolean exists(@Param("email") String email);
+    @Query("select count(a) > 0 from Account a where a.email = :email")
+    boolean exists(@Param("email") String email);
 }

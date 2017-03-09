@@ -4,7 +4,8 @@ import by.fpm.barbuk.account.Account;
 import by.fpm.barbuk.cloudEntities.CloudFile;
 import by.fpm.barbuk.cloudEntities.CloudFolder;
 import by.fpm.barbuk.cloudEntities.FolderList;
-import by.fpm.barbuk.google.drive.GoogleUser;
+import by.fpm.barbuk.temboo.CloudHelper;
+import by.fpm.barbuk.temboo.TembooHelper;
 import com.sun.org.apache.xml.internal.security.utils.Base64;
 import com.temboo.Library.Dropbox.FileOperations.CreateFolder;
 import com.temboo.Library.Dropbox.FileOperations.DeleteFileOrFolder;
@@ -14,7 +15,6 @@ import com.temboo.Library.Dropbox.FilesAndMetadata.UploadFile;
 import com.temboo.Library.Dropbox.OAuth.FinalizeOAuth;
 import com.temboo.Library.Dropbox.OAuth.InitializeOAuth;
 import com.temboo.core.TembooException;
-import com.temboo.core.TembooSession;
 import javafx.util.Pair;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -23,21 +23,20 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.crypto.*;
-import javax.crypto.spec.SecretKeySpec;
-import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
-import java.net.MalformedURLException;
 import java.net.URL;
-import java.security.*;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
 
-public final class DropboxHelper {
+public final class DropboxHelper extends TembooHelper implements CloudHelper {
 
     // Provide your dropbox App ID and App Secret.
     private static final String APP_ID = "mvfavfx9yg4ts62";
@@ -46,12 +45,11 @@ public final class DropboxHelper {
     // Callback URI that Temboo will redirect to after successful authentication.
     private static final String FORWARDING_URL = "http://localhost:8080/dropbox/OAuthLogIn";
 
-    private String stateToken;
 
     // Replace with your Temboo credentials.
-    private static final String TEMBOO_ACCOUNT_NAME = "angelinabarbuk";
+    /*private static final String TEMBOO_ACCOUNT_NAME = "angelinabarbukyandex";
     private static final String TEMBOO_APP_KEY_NAME = "myFirstApp";
-    private static final String TEMBOO_APP_KEY_VALUE = "dz7TFlG60iXUQhhBkR4bBZ7jMQyK7U0A";
+    private static final String TEMBOO_APP_KEY_VALUE = "uNiSBe4QkSlOtZ1a7Zozh4sERQfQOdQh";
 
     private TembooSession session = null;
 
@@ -66,15 +64,18 @@ public final class DropboxHelper {
         } catch (Exception te) {
             te.printStackTrace();
         }
-    }
+    }*/
 
+    @Override
     public String getLoginUrl() {
 
         String authURL = "";
         try {
             InitializeOAuth initializeOAuthChoreo = new InitializeOAuth(session);
             InitializeOAuth.InitializeOAuthInputSet initializeOAuthInputs = initializeOAuthChoreo.newInputSet();
-            initializeOAuthInputs.setCredential("course");
+            initializeOAuthInputs.set_DropboxAppSecret(APP_SECRET);
+            initializeOAuthInputs.set_DropboxAppKey(APP_ID);
+            /*initializeOAuthInputs.setCredential("course");*/
             initializeOAuthInputs.set_ForwardingURL(FORWARDING_URL);
             InitializeOAuth.InitializeOAuthResultSet initializeOAuthResults = initializeOAuthChoreo.execute(initializeOAuthInputs);
             authURL = initializeOAuthResults.get_AuthorizationURL();
@@ -87,15 +88,13 @@ public final class DropboxHelper {
         return authURL;
     }
 
-    private void generateStateToken() {
-        SecureRandom random = new SecureRandom();
-        stateToken = "dropbox-" + random.nextInt();
-    }
 
+    @Override
     public String getStateToken() {
         return stateToken;
     }
 
+    @Override
     public DropboxUser getUserInfo() throws IOException {
         try {
             FinalizeOAuth finalizeOAuthChoreo = new FinalizeOAuth(session);
@@ -122,7 +121,9 @@ public final class DropboxHelper {
         return null;
     }
 
-    public CloudFolder getFolderContent(String path, DropboxUser user) throws TembooException, JSONException, UnsupportedEncodingException {
+    @Override
+    public CloudFolder getFolderContent(String path, Account account) throws TembooException, JSONException, UnsupportedEncodingException {
+        DropboxUser user = account.getDropboxUser();
         ListFolderContents listFolderContentsChoreo = new ListFolderContents(session);
         ListFolderContents.ListFolderContentsInputSet listFolderContentsInputs = listFolderContentsChoreo.newInputSet();
 
@@ -187,7 +188,9 @@ public final class DropboxHelper {
     }
 
 
-    public FolderList getFolders(String path, DropboxUser user) throws TembooException, JSONException, UnsupportedEncodingException {
+    @Override
+    public FolderList getFolders(String path, Account account) throws TembooException, JSONException, UnsupportedEncodingException {
+        DropboxUser user = account.getDropboxUser();
         FolderList folderList = new FolderList();
         ListFolderContents listFolderContentsChoreo = new ListFolderContents(session);
         ListFolderContents.ListFolderContentsInputSet listFolderContentsInputs = listFolderContentsChoreo.newInputSet();
@@ -233,8 +236,9 @@ public final class DropboxHelper {
         return folderList;
     }
 
-    public String getDownloadFileLink(String path, DropboxUser user) throws TembooException {
-
+    @Override
+    public String getDownloadFileLink(String path, Account account) throws TembooException {
+        DropboxUser user = account.getDropboxUser();
         GetDownloadLink getDownloadLinkChoreo = new GetDownloadLink(session);
         GetDownloadLink.GetDownloadLinkInputSet getDownloadLinkInputs = getDownloadLinkChoreo.newInputSet();
 
@@ -248,8 +252,9 @@ public final class DropboxHelper {
         return getDownloadLinkResults.get_URL();
     }
 
-    public boolean delete(String path, DropboxUser user) throws TembooException, JSONException {
-
+    @Override
+    public boolean delete(String path, Account account) throws TembooException, JSONException {
+        DropboxUser user = account.getDropboxUser();
         DeleteFileOrFolder deleteFileOrFolderChoreo = new DeleteFileOrFolder(session);
         DeleteFileOrFolder.DeleteFileOrFolderInputSet deleteFileOrFolderInputs = deleteFileOrFolderChoreo.newInputSet();
 
@@ -264,7 +269,8 @@ public final class DropboxHelper {
         return result.getBoolean("is_deleted");
     }
 
-    public boolean createFolder(String path, DropboxUser user) throws TembooException {
+    public boolean createFolder(String path, Account account) throws TembooException {
+        DropboxUser user = account.getDropboxUser();
         CreateFolder createFolderChoreo = new CreateFolder(session);
         CreateFolder.CreateFolderInputSet createFolderInputs = createFolderChoreo.newInputSet();
 
@@ -278,7 +284,9 @@ public final class DropboxHelper {
         return true;
     }
 
-    public boolean uploadFile(MultipartFile file, String path, DropboxUser user) throws TembooException, IOException {
+    @Override
+    public boolean uploadFile(MultipartFile file, String path, Account account) throws TembooException, IOException {
+        DropboxUser user = account.getDropboxUser();
         UploadFile uploadFileChoreo = new UploadFile(session);
         UploadFile.UploadFileInputSet uploadFileInputs = uploadFileChoreo.newInputSet();
 
@@ -295,12 +303,12 @@ public final class DropboxHelper {
         return true;
     }
 
-    public Account encrypt(String path, Account account ) throws TembooException, IOException, NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException, JSONException {
+    public Account encrypt(String path, Account account) throws TembooException, IOException, NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException, JSONException {
         DropboxUser dropboxUser = account.getDropboxUser();
         try {
 
 
-            String urlStr = getDownloadFileLink(path, dropboxUser);
+            String urlStr = getDownloadFileLink(path, account);
             URL url = new URL(urlStr);
             HttpURLConnection httpConn = (HttpURLConnection) url.openConnection();
             int responseCode = httpConn.getResponseCode();
@@ -356,7 +364,7 @@ public final class DropboxHelper {
                     uploadFileInputs.set_FileName(fileName);
                     UploadFile.UploadFileResultSet uploadFileResults = uploadFileChoreo.execute(uploadFileInputs);
                     JSONObject response = new JSONObject(uploadFileResults.get_Response());
-                    dropboxUser.getEncryptionKeys().put(response.getString("path"),secretKey);
+                    dropboxUser.getEncryptionKeys().put(response.getString("path"), secretKey);
 
                 } else {
                     SecretKey secretKey = dropboxUser.getEncryptionKeys().get(path);
@@ -369,7 +377,7 @@ public final class DropboxHelper {
                     UploadFile.UploadFileResultSet uploadFileResults = uploadFileChoreo.execute(uploadFileInputs);
                 }
             }
-        }catch (Exception ex){
+        } catch (Exception ex) {
             System.out.println("err");
         }
         return account;

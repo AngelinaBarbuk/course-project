@@ -105,11 +105,11 @@ var context = context || (function () {
                 for (var i = 0; i < x.length; i++) {
                     x[i].classList.remove("selected");
                 }
-                if(e.target.tagName=='A'){
+                if (e.target.tagName == 'A') {
                     e.target.classList.add("selected");
-                }else if(e.target.parentNode.tagName=='A'){
+                } else if (e.target.parentNode.tagName == 'A') {
                     e.target.parentNode.classList.add("selected");
-                }else if(e.target.parentNode.parentNode.tagName=='A'){
+                } else if (e.target.parentNode.parentNode.tagName == 'A') {
                     e.target.parentNode.parentNode.classList.add("selected");
                 }
 

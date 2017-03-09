@@ -3,9 +3,8 @@ package by.fpm.barbuk;
 import by.fpm.barbuk.account.Account;
 import by.fpm.barbuk.account.AccountService;
 import by.fpm.barbuk.dropbox.DropboxHelper;
-import by.fpm.barbuk.dropbox.DropboxUser;
 import by.fpm.barbuk.google.drive.GoogleHelper;
-import by.fpm.barbuk.google.drive.GoogleUser;
+import by.fpm.barbuk.temboo.CloudHelper;
 import com.temboo.core.TembooException;
 import org.json.JSONException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,7 +20,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.*;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
@@ -31,17 +31,16 @@ public class MoveController {
     private AccountService accountService;
 
     private GoogleHelper googleHelper = new GoogleHelper();
-    private DropboxHelper dropboxHelper = new DropboxHelper();
+    private CloudHelper dropboxHelper = new DropboxHelper();
 
     @RequestMapping(value = "/dropbox_to_google", method = RequestMethod.POST)
     @Secured({"ROLE_USER", "ROLE_ADMIN"})
     @ResponseBody
     public String dropboxToGoogle(@RequestParam(name = "fileToMove") String path, @RequestParam(name = "pathToMove") String folderName) throws JSONException, TembooException, IOException {
-        DropboxUser dropboxUser = getAccount().getDropboxUser();
-        GoogleUser googleUser = getAccount().getGoogleUser();
-        String url = dropboxHelper.getDownloadFileLink(path, dropboxUser);
+        Account account = getAccount();
+        String url = dropboxHelper.getDownloadFileLink(path, account);
         MultipartFile file = downloadFile(url);
-        boolean result = googleHelper.uploadFile(file, folderName, googleUser);
+        boolean result = googleHelper.uploadFile(file, folderName, account);
 
         return "success";
     }
@@ -50,11 +49,10 @@ public class MoveController {
     @Secured({"ROLE_USER", "ROLE_ADMIN"})
     @ResponseBody
     public String googleToDropbox(@RequestParam(name = "fileToMove") String path, @RequestParam(name = "pathToMove") String folderName) throws JSONException, TembooException, IOException {
-        DropboxUser dropboxUser = getAccount().getDropboxUser();
-        GoogleUser googleUser = getAccount().getGoogleUser();
-        String url = googleHelper.getDownloadFileLink(path, googleUser);
+        Account account = getAccount();
+        String url = googleHelper.getDownloadFileLink(path, account);
         MultipartFile file = downloadFile(url);
-        boolean result = dropboxHelper.uploadFile(file, folderName, dropboxUser);
+        boolean result = dropboxHelper.uploadFile(file, folderName, account);
         return "success";
     }
 
@@ -81,7 +79,7 @@ public class MoveController {
                 if (index > 0) {
                     fileName = disposition.substring(index + 10,
                             disposition.length() - 1);
-                    fileName=fileName.substring(0,fileName.indexOf("\""));
+                    fileName = fileName.substring(0, fileName.indexOf("\""));
                 }
             } else {
                 fileName = urlStr.substring(urlStr.lastIndexOf("/") + 1,

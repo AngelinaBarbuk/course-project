@@ -1,12 +1,12 @@
 package by.fpm.barbuk.google.drive;
 
+import by.fpm.barbuk.account.CloudUser;
+
 /**
  * Created by B on 02.12.2016.
  */
-public class GoogleUser implements java.io.Serializable {
+public class GoogleUser extends CloudUser {
 
-    private String userId;
-    private String accessToken;
     private String refreshToken;
 
     public String getUserId() {

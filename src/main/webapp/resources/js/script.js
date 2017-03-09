@@ -201,9 +201,9 @@ $(function () {
                 }
 
                 /*else if (typeof items === 'object') {
-                    scannedFolders = items.folders;
-                    scannedFiles = items.files;
-                }*/
+                 scannedFolders = items.folders;
+                 scannedFiles = items.files;
+                 }*/
 
                 // Empty the old result and make the new one
                 fileList.empty().hide();

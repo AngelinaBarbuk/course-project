@@ -1,17 +1,17 @@
 package by.fpm.barbuk.dropbox;
 
+import by.fpm.barbuk.account.CloudUser;
+
 import javax.crypto.SecretKey;
 import java.util.Map;
 
 /**
  * Created by B on 02.12.2016.
  */
-public class DropboxUser implements java.io.Serializable {
+public class DropboxUser extends CloudUser {
 
-    private String userId;
-    private String accessToken;
     private String accessSecret;
-    private Map<String,SecretKey> encryptionKeys;
+    private Map<String, SecretKey> encryptionKeys;
 
     public String getUserId() {
         return userId;

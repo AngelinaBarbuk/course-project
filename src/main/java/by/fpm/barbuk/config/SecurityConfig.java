@@ -35,32 +35,32 @@ class SecurityConfig extends WebSecurityConfigurerAdapter {
     @Override
     protected void configure(AuthenticationManagerBuilder auth) throws Exception {
         auth
-            .eraseCredentials(true)
-            .userDetailsService(accountService)
-            .passwordEncoder(passwordEncoder());
+                .eraseCredentials(true)
+                .userDetailsService(accountService)
+                .passwordEncoder(passwordEncoder());
     }
 
     @Override
     protected void configure(HttpSecurity http) throws Exception {
         http
-            .csrf()
+                .csrf()
                 .disable()
-            .authorizeRequests()
+                .authorizeRequests()
                 .antMatchers("/**", "/favicon.ico", "/resources/**", "/signup", "/about").permitAll()
                 .anyRequest().permitAll()
                 .and()
-            .formLogin()
+                .formLogin()
                 .loginPage("/signin")
                 .permitAll()
                 .failureUrl("/signin?error=1")
                 .loginProcessingUrl("/authenticate")
                 .and()
-            .logout()
+                .logout()
                 .logoutUrl("/logout")
                 .permitAll()
                 .logoutSuccessUrl("/signin?logout")
                 .and()
-            .rememberMe()
+                .rememberMe()
                 .rememberMeServices(rememberMeServices())
                 .key("remember-me-key");
     }

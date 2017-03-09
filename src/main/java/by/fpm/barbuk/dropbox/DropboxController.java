@@ -2,7 +2,6 @@ package by.fpm.barbuk.dropbox;
 
 import by.fpm.barbuk.account.Account;
 import by.fpm.barbuk.account.AccountService;
-import by.fpm.barbuk.cloudEntities.CloudFile;
 import by.fpm.barbuk.cloudEntities.CloudFolder;
 import by.fpm.barbuk.cloudEntities.FolderList;
 import by.fpm.barbuk.support.web.AjaxRequestBody;
@@ -10,7 +9,6 @@ import by.fpm.barbuk.support.web.AjaxResponseBody;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.temboo.core.TembooException;
-import javafx.util.Pair;
 import org.json.JSONException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -31,7 +29,6 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
-import java.util.List;
 
 /**
  * Created by B on 02.12.2016.
@@ -55,8 +52,7 @@ public class DropboxController {
     @ResponseBody
     String dropboxAjax(@RequestBody AjaxRequestBody requestBody) throws JSONException, TembooException, JsonProcessingException, UnsupportedEncodingException {
         if (requestBody.getRequestType().equals("Open_Dir")) {
-            DropboxUser dropboxUser = getAccount().getDropboxUser();
-            CloudFolder result = dropboxHelper.getFolderContent(requestBody.getPath(), dropboxUser);
+            CloudFolder result = dropboxHelper.getFolderContent(requestBody.getPath(), getAccount());
             return mapper.writeValueAsString(result);
         }
         return mapper.writeValueAsString(new AjaxResponseBody());
@@ -66,8 +62,7 @@ public class DropboxController {
     @Secured({"ROLE_USER", "ROLE_ADMIN"})
     @ResponseStatus(HttpStatus.OK)
     public ModelAndView dropboxPath(@RequestParam(name = "path") String path, HttpServletResponse response) throws JSONException, TembooException, JsonProcessingException, UnsupportedEncodingException {
-        DropboxUser dropboxUser = getAccount().getDropboxUser();
-        CloudFolder result = dropboxHelper.getFolderContent(path, dropboxUser);
+        CloudFolder result = dropboxHelper.getFolderContent(path, getAccount());
         result.setCloudStorage("/dropbox");
         ModelAndView modelAndView = new ModelAndView();
         modelAndView.addObject("cloudFolder", result);
@@ -78,8 +73,7 @@ public class DropboxController {
     @RequestMapping(value = "/dropbox/download", method = RequestMethod.GET)
     @Secured({"ROLE_USER", "ROLE_ADMIN"})
     public String dropboxDownload(@RequestParam(name = "path") String path) throws JSONException, TembooException, IOException {
-        DropboxUser dropboxUser = getAccount().getDropboxUser();
-        String result = dropboxHelper.getDownloadFileLink(path, dropboxUser);
+        String result = dropboxHelper.getDownloadFileLink(path, getAccount());
         return "redirect:" + result;
     }
 
@@ -96,8 +90,7 @@ public class DropboxController {
     @Secured({"ROLE_USER", "ROLE_ADMIN"})
     @ResponseBody
     public FolderList dropboxGetFolders(@RequestParam(name = "path") String path) throws JSONException, TembooException, IOException {
-        DropboxUser dropboxUser = getAccount().getDropboxUser();
-        FolderList result = dropboxHelper.getFolders(path, dropboxUser);
+        FolderList result = dropboxHelper.getFolders(path, getAccount());
         return result;
     }
 
@@ -105,8 +98,7 @@ public class DropboxController {
     @Secured({"ROLE_USER", "ROLE_ADMIN"})
     @ResponseBody
     public String dropboxDelete(@RequestParam(name = "path") String path) throws JSONException, TembooException, IOException {
-        DropboxUser dropboxUser = getAccount().getDropboxUser();
-        boolean result = dropboxHelper.delete(path, dropboxUser);
+        boolean result = dropboxHelper.delete(path, getAccount());
         return "success";
     }
 
@@ -114,17 +106,15 @@ public class DropboxController {
     @Secured({"ROLE_USER", "ROLE_ADMIN"})
     @ResponseBody
     public String dropboxCreateFolder(@RequestParam(name = "path") String path) throws JSONException, TembooException, IOException {
-        DropboxUser dropboxUser = getAccount().getDropboxUser();
-        boolean result = dropboxHelper.createFolder(path, dropboxUser);
+        boolean result = dropboxHelper.createFolder(path, getAccount());
         return "success";
     }
 
     @RequestMapping(value = "/dropbox/uploadFile", method = RequestMethod.POST)
     @Secured({"ROLE_USER", "ROLE_ADMIN"})
     public String dropboxUploadFile(@RequestParam(name = "path") String path, @RequestParam("file") MultipartFile file) throws JSONException, TembooException, IOException {
-        DropboxUser dropboxUser = getAccount().getDropboxUser();
-        boolean result = dropboxHelper.uploadFile(file, path, dropboxUser);
-        return "redirect:/dropbox/folder?path="+path;
+        boolean result = dropboxHelper.uploadFile(file, path, getAccount());
+        return "redirect:/dropbox/folder?path=" + path;
     }
 
     private Account getAccount() {

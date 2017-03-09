@@ -200,19 +200,19 @@ $(function () {
             var x = document.getElementsByClassName("selected");
             var p = x[0].getElementsByTagName("input")[0].value;
             if (p) {
-                    $.ajax({
-                        url: cloudStorage + '/encrypt?path='+p,
-                        type: 'GET',
-                        success: function (result) {
-                            $("#dialog-message-ok").dialog('open');
-                             location.reload();
-                        },
-                        fail: function (result) {
-                            $("#dialog-message-fail").dialog('open');
-                        }
-                    });
-                }
+                $.ajax({
+                    url: cloudStorage + '/encrypt?path=' + p,
+                    type: 'GET',
+                    success: function (result) {
+                        $("#dialog-message-ok").dialog('open');
+                        location.reload();
+                    },
+                    fail: function (result) {
+                        $("#dialog-message-fail").dialog('open');
+                    }
+                });
             }
+        }
         }
     ]);
 

@@ -7,13 +7,13 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 @Controller
 class AboutController {
 
-	@ModelAttribute("module")
-	String module() {
-		return "about";
-	}
+    @ModelAttribute("module")
+    String module() {
+        return "about";
+    }
 
-	@GetMapping("/about")
-	String about() {
-		return "home/about";
-	}
+    @GetMapping("/about")
+    String about() {
+        return "home/about";
+    }
 }

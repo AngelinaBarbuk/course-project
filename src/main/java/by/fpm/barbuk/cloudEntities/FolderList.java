@@ -1,7 +1,5 @@
 package by.fpm.barbuk.cloudEntities;
 
-import javafx.util.Pair;
-
 import java.util.List;
 
 /**
@@ -10,7 +8,7 @@ import java.util.List;
 public class FolderList {
 
     private List<CloudFile> folders;
-    private String  prevFolder;
+    private String prevFolder;
 
     public List<CloudFile> getFolders() {
         return folders;
