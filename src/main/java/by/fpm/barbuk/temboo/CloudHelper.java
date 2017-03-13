@@ -25,13 +25,13 @@ public interface CloudHelper {
 
     FolderList getFolders(String path, Account account) throws TembooException, JSONException, UnsupportedEncodingException;
 
-    String getDownloadFileLink(String path, Account account) throws TembooException, JSONException;
+    String getDownloadFileLink(String path, Account account, boolean isFileContent) throws TembooException, JSONException;
 
     boolean delete(String path, Account account) throws TembooException, JSONException;
 
     /*boolean createFolder(String path, Account account) throws TembooException;*/
 
-    boolean uploadFile(MultipartFile file, String path, Account account) throws TembooException, IOException, JSONException;
+    String uploadFile(MultipartFile file, String path, Account account) throws TembooException, IOException, JSONException;
 
     /*Account encrypt(String path, Account account) throws TembooException, IOException, NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException, JSONException;*/
 }

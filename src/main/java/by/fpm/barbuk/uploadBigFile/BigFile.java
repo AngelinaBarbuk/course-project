@@ -12,6 +12,7 @@ public class BigFile implements java.io.Serializable {
     private String fileName;
     private String type;
     private List<FilePart> parts = new ArrayList<>();
+    private long size;
 
     public BigFile() {
         id = "" + UserFiles.counter++;
@@ -47,5 +48,13 @@ public class BigFile implements java.io.Serializable {
 
     public void setType(String type) {
         this.type = type;
+    }
+
+    public long getSize() {
+        return size;
+    }
+
+    public void setSize(long size) {
+        this.size = size;
     }
 }

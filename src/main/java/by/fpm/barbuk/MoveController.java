@@ -38,10 +38,9 @@ public class MoveController {
     @ResponseBody
     public String dropboxToGoogle(@RequestParam(name = "fileToMove") String path, @RequestParam(name = "pathToMove") String folderName) throws JSONException, TembooException, IOException {
         Account account = getAccount();
-        String url = dropboxHelper.getDownloadFileLink(path, account);
+        String url = dropboxHelper.getDownloadFileLink(path, account, false);
         MultipartFile file = downloadFile(url);
-        boolean result = googleHelper.uploadFile(file, folderName, account);
-
+        googleHelper.uploadFile(file, folderName, account);
         return "success";
     }
 
@@ -50,9 +49,9 @@ public class MoveController {
     @ResponseBody
     public String googleToDropbox(@RequestParam(name = "fileToMove") String path, @RequestParam(name = "pathToMove") String folderName) throws JSONException, TembooException, IOException {
         Account account = getAccount();
-        String url = googleHelper.getDownloadFileLink(path, account);
+        String url = googleHelper.getDownloadFileLink(path, account, false);
         MultipartFile file = downloadFile(url);
-        boolean result = dropboxHelper.uploadFile(file, folderName, account);
+        dropboxHelper.uploadFile(file, folderName, account);
         return "success";
     }
 
@@ -62,7 +61,7 @@ public class MoveController {
         return accountService.loadAccountByUsername(user.getUsername());
     }
 
-    public MultipartFile downloadFile(String urlStr) throws TembooException, JSONException, IOException {
+    public static MultipartFile downloadFile(String urlStr) throws TembooException, JSONException, IOException {
         URL url = new URL(urlStr);
         HttpURLConnection httpConn = (HttpURLConnection) url.openConnection();
         int responseCode = httpConn.getResponseCode();

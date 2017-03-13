@@ -13,6 +13,7 @@ public class FilePart implements Serializable {
     private String path;
     private SecretKey secretKey;
     private MultipartFile file;
+    private long size;
 
     public String getCloudName() {
         return cloudName;
@@ -44,5 +45,13 @@ public class FilePart implements Serializable {
 
     public void setFile(MultipartFile file) {
         this.file = file;
+    }
+
+    public long getSize() {
+        return size;
+    }
+
+    public void setSize(long size) {
+        this.size = size;
     }
 }

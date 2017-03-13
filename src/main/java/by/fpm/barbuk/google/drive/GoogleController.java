@@ -75,7 +75,7 @@ public class GoogleController {
     @RequestMapping(value = "/google/download", method = RequestMethod.GET)
     @Secured({"ROLE_USER", "ROLE_ADMIN"})
     public String googleDownload(@RequestParam(name = "path") String path) throws JSONException, TembooException, IOException {
-        String result = googleHelper.getDownloadFileLink(path, getAccount());
+        String result = googleHelper.getDownloadFileLink(path, getAccount(), false);
         return "redirect:" + result;
     }
 
@@ -98,7 +98,7 @@ public class GoogleController {
     @RequestMapping(value = "/google/uploadFile", method = RequestMethod.POST)
     @Secured({"ROLE_USER", "ROLE_ADMIN"})
     public String googleUploadFile(@RequestParam(name = "path") String path, @RequestParam("file") MultipartFile file) throws JSONException, TembooException, IOException {
-        boolean result = googleHelper.uploadFile(file, path, getAccount());
+        googleHelper.uploadFile(file, path, getAccount());
         return "redirect:/google/folder?path=" + path;
     }
 

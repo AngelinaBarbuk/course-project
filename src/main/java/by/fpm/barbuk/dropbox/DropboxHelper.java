@@ -237,7 +237,7 @@ public final class DropboxHelper extends TembooHelper implements CloudHelper {
     }
 
     @Override
-    public String getDownloadFileLink(String path, Account account) throws TembooException {
+    public String getDownloadFileLink(String path, Account account, boolean isFileContent) throws TembooException {
         DropboxUser user = account.getDropboxUser();
         GetDownloadLink getDownloadLinkChoreo = new GetDownloadLink(session);
         GetDownloadLink.GetDownloadLinkInputSet getDownloadLinkInputs = getDownloadLinkChoreo.newInputSet();
@@ -285,7 +285,7 @@ public final class DropboxHelper extends TembooHelper implements CloudHelper {
     }
 
     @Override
-    public boolean uploadFile(MultipartFile file, String path, Account account) throws TembooException, IOException {
+    public String uploadFile(MultipartFile file, String path, Account account) throws TembooException, IOException {
         DropboxUser user = account.getDropboxUser();
         UploadFile uploadFileChoreo = new UploadFile(session);
         UploadFile.UploadFileInputSet uploadFileInputs = uploadFileChoreo.newInputSet();
@@ -294,13 +294,14 @@ public final class DropboxHelper extends TembooHelper implements CloudHelper {
         uploadFileInputs.set_AppSecret(APP_SECRET);
         uploadFileInputs.set_AccessToken(user.getAccessToken());
         uploadFileInputs.set_AccessTokenSecret(user.getAccessSecret());
-        uploadFileInputs.set_Folder("root".equals(path) ? "" : path);
+        String realPath = "root".equals(path) ? "/" : path;
+        uploadFileInputs.set_Folder(realPath);
         String base64 = Base64.encode(file.getBytes());
         uploadFileInputs.set_FileContents(base64);
         uploadFileInputs.set_FileName(file.getOriginalFilename());
 
         UploadFile.UploadFileResultSet uploadFileResults = uploadFileChoreo.execute(uploadFileInputs);
-        return true;
+        return realPath+file.getOriginalFilename();
     }
 
     public Account encrypt(String path, Account account) throws TembooException, IOException, NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException, JSONException {
@@ -308,7 +309,7 @@ public final class DropboxHelper extends TembooHelper implements CloudHelper {
         try {
 
 
-            String urlStr = getDownloadFileLink(path, account);
+            String urlStr = getDownloadFileLink(path, account, false);
             URL url = new URL(urlStr);
             HttpURLConnection httpConn = (HttpURLConnection) url.openConnection();
             int responseCode = httpConn.getResponseCode();

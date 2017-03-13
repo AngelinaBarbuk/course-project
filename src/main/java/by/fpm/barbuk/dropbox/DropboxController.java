@@ -73,7 +73,7 @@ public class DropboxController {
     @RequestMapping(value = "/dropbox/download", method = RequestMethod.GET)
     @Secured({"ROLE_USER", "ROLE_ADMIN"})
     public String dropboxDownload(@RequestParam(name = "path") String path) throws JSONException, TembooException, IOException {
-        String result = dropboxHelper.getDownloadFileLink(path, getAccount());
+        String result = dropboxHelper.getDownloadFileLink(path, getAccount(), false);
         return "redirect:" + result;
     }
 
@@ -113,7 +113,7 @@ public class DropboxController {
     @RequestMapping(value = "/dropbox/uploadFile", method = RequestMethod.POST)
     @Secured({"ROLE_USER", "ROLE_ADMIN"})
     public String dropboxUploadFile(@RequestParam(name = "path") String path, @RequestParam("file") MultipartFile file) throws JSONException, TembooException, IOException {
-        boolean result = dropboxHelper.uploadFile(file, path, getAccount());
+        dropboxHelper.uploadFile(file, path, getAccount());
         return "redirect:/dropbox/folder?path=" + path;
     }
 

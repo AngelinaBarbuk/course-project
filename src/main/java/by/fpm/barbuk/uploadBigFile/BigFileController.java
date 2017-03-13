@@ -34,6 +34,13 @@ public class BigFileController {
         return "bigFile";
     }
 
+    @RequestMapping(value = "/bigFile/download", method = RequestMethod.GET)
+    @Secured({"ROLE_USER", "ROLE_ADMIN"})
+    public String bigFileDownload(@RequestParam(name = "path") String path) throws JSONException, TembooException, IOException {
+        bigFileHelper.downloadFile(path, getAccount());
+        return "bigFile/bigFile";
+    }
+
     @RequestMapping(value = "/bigFile/uploadFile", method = RequestMethod.POST)
     @Secured({"ROLE_USER", "ROLE_ADMIN"})
     public String uploadBigFile(@RequestParam("file") MultipartFile file) throws JSONException, TembooException, IOException {
@@ -43,15 +50,6 @@ public class BigFileController {
         account.setUserBigFiles(userFiles);
         accountService.updateUsers(account);
         return "redirect:/bigFile";
-    }
-
-    @RequestMapping(value = "/bigFile/download", method = RequestMethod.GET)
-    @Secured({"ROLE_USER", "ROLE_ADMIN"})
-    public String dropboxDownload(@RequestParam(name = "path") String path) throws JSONException, TembooException, IOException {
-        /*DropboxUser dropboxUser = getAccount().getDropboxUser();
-        String result = dropboxHelper.getDownloadFileLink(path, dropboxUser);
-        return "redirect:" + result;*/
-        return "";
     }
 
     private Account getAccount() {

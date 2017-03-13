@@ -104,6 +104,10 @@ public final class GoogleHelper extends TembooHelper implements CloudHelper {
         listInputs.set_FileID(path);
 // Execute Choreo
         com.temboo.Library.Google.Drive.Parents.List.ListResultSet listResults = listChoreo.execute(listInputs);
+        String newAccessToken =listResults.get_NewAccessToken();
+        if(newAccessToken!=null&&!newAccessToken.isEmpty()){
+            user.setAccessToken(newAccessToken);
+        }
         JSONObject jsonObject = new JSONObject(listResults.get_Response());
         JSONArray array = jsonObject.getJSONArray("items");
         List<Pair<String, String>> pairs = new ArrayList<>();
@@ -132,6 +136,11 @@ public final class GoogleHelper extends TembooHelper implements CloudHelper {
 
         com.temboo.Library.Google.Drive.Files.List.ListResultSet filesListResults = filesListChoreo.execute(filesListInputs);
         if (filesListResults.getException() == null) {
+            String newAccessToken =filesListResults.get_NewAccessToken();
+            if(newAccessToken!=null&&!newAccessToken.isEmpty()){
+                user.setAccessToken(newAccessToken);
+                account.setGoogleUser(user);
+            }
             JSONObject result = new JSONObject(filesListResults.get_Response());
             CloudFolder cloudFolder = new CloudFolder();
             cloudFolder.setCurrentPath(path);
@@ -182,6 +191,11 @@ public final class GoogleHelper extends TembooHelper implements CloudHelper {
         try {
             com.temboo.Library.Google.Drive.Files.List.ListResultSet filesListResults = filesListChoreo.execute(filesListInputs);
             if (filesListResults.getException() == null) {
+                String newAccessToken =filesListResults.get_NewAccessToken();
+                if(newAccessToken!=null&&!newAccessToken.isEmpty()){
+                    user.setAccessToken(newAccessToken);
+                    account.setGoogleUser(user);
+                }
                 JSONObject result = new JSONObject(filesListResults.get_Response());
                 JSONArray content = result.getJSONArray("items");
                 List<CloudFile> folders = new ArrayList<>();
@@ -208,7 +222,7 @@ public final class GoogleHelper extends TembooHelper implements CloudHelper {
         return folderList;
     }
 
-    public String getDownloadFileLink(String path, Account account) throws TembooException, JSONException {
+    public String getDownloadFileLink(String path, Account account, boolean isFileContent) throws TembooException, JSONException {
         GoogleUser user = account.getGoogleUser();
         Get getChoreo = new Get(session);
         Get.GetInputSet getInputs = getChoreo.newInputSet();
@@ -217,15 +231,25 @@ public final class GoogleHelper extends TembooHelper implements CloudHelper {
         getInputs.set_ClientSecret(CLIENT_SECRET);
         getInputs.set_AccessToken(user.getAccessToken());
         getInputs.set_FileID(path);
-        getInputs.setInput("alt", "media");
-
+        /*if(isFileContent) {
+            getInputs.setInput("alt", "media");
+        }*/
         Get.GetResultSet getResults = getChoreo.execute(getInputs);
-        JSONObject result = new JSONObject(getResults.get_FileMetadata());
-        if (result.has("exportLinks")) {
-            JSONObject object = result.getJSONObject("exportLinks");
-            return object.getString("application/zip");
+        String newAccessToken =getResults.get_NewAccessToken();
+        if(newAccessToken!=null&&!newAccessToken.isEmpty()){
+            user.setAccessToken(newAccessToken);
+            account.setGoogleUser(user);
         }
-        return result.getString("webContentLink");
+        JSONObject result = new JSONObject(getResults.get_FileMetadata());
+        if(!isFileContent) {
+            System.out.println(result);
+            if (result.has("exportLinks")) {
+                JSONObject object = result.getJSONObject("exportLinks");
+                return object.getString("application/zip");
+            }
+            return result.getString("webContentLink");
+        }
+        return result.getString("downloadUrl");
     }
 
     public boolean delete(String path, Account account) throws TembooException, JSONException {
@@ -239,7 +263,11 @@ public final class GoogleHelper extends TembooHelper implements CloudHelper {
         deleteInputs.set_FileID(path);
 
         Delete.DeleteResultSet deleteResults = deleteChoreo.execute(deleteInputs);
-
+        String newAccessToken =deleteResults.get_NewAccessToken();
+        if(newAccessToken!=null&&!newAccessToken.isEmpty()){
+            user.setAccessToken(newAccessToken);
+            account.setGoogleUser(user);
+        }
         return "SUCCESS".equals(deleteResults.getCompletionStatus());
     }
 
@@ -262,11 +290,16 @@ public final class GoogleHelper extends TembooHelper implements CloudHelper {
         }
         insertInputs.set_RequestBody(object.toString());
         Insert.InsertResultSet insertResults = insertChoreo.execute(insertInputs);
+        String newAccessToken =insertResults.get_NewAccessToken();
+        if(newAccessToken!=null&&!newAccessToken.isEmpty()){
+            user.setAccessToken(newAccessToken);
+            account.setGoogleUser(user);
+        }
         return "SUCCESS".equals(insertResults.getCompletionStatus());
 
     }
 
-    public boolean uploadFile(MultipartFile file, String path, Account account) throws TembooException, IOException, JSONException {
+    public String uploadFile(MultipartFile file, String path, Account account) throws TembooException, IOException, JSONException {
         GoogleUser user = account.getGoogleUser();
         Insert insertChoreo = new Insert(session);
         Insert.InsertInputSet insertInputs = insertChoreo.newInputSet();
@@ -291,11 +324,17 @@ public final class GoogleHelper extends TembooHelper implements CloudHelper {
             insertInputs.set_ContentType("text/plain");
         try {
             Insert.InsertResultSet insertResults = insertChoreo.execute(insertInputs);
-            return "SUCCESS".equals(insertResults.getCompletionStatus());
+            String newAccessToken =insertResults.get_NewAccessToken();
+            if(newAccessToken!=null&&!newAccessToken.isEmpty()){
+                user.setAccessToken(newAccessToken);
+                account.setGoogleUser(user);
+            }
+            JSONObject result = new JSONObject(insertResults.get_Response());
+            return result.getString("id");
         } catch (Exception ex) {
             System.out.println("err");
         }
-        return true;
+        return "";
     }
 
 }

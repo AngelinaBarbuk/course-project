@@ -34,7 +34,7 @@
 
         <ul class="data">
             <li th:each="file : ${files.getBigFiles()}" class="files context-menu-file">
-                <a th:href="'/bigFile/download' + ${file.getId()}" th:title="${file.getFileName()}"
+                <a th:href="'/bigFile/download?path=' + ${file.getId()}" th:title="${file.getFileName()}"
                    class="files">
                     <input type="hidden" name="documentLink" th:value="${file.getId()}"/>
                     <span th:class="'icon file f-' + ${file.getType()}"><p th:text="${file.getType()}"/></span>
