@@ -1,5 +1,6 @@
 package by.fpm.barbuk.google.drive;
 
+import by.fpm.barbuk.MoveController;
 import by.fpm.barbuk.account.Account;
 import by.fpm.barbuk.account.AccountService;
 import by.fpm.barbuk.cloudEntities.CloudFolder;
@@ -75,7 +76,8 @@ public class GoogleController {
     @RequestMapping(value = "/google/download", method = RequestMethod.GET)
     @Secured({"ROLE_USER", "ROLE_ADMIN"})
     public String googleDownload(@RequestParam(name = "path") String path) throws JSONException, TembooException, IOException {
-        String result = googleHelper.getDownloadFileLink(path, getAccount(), false);
+        String result = googleHelper.getDownloadFileLink(path, getAccount(), true);
+        MoveController.downloadFile(result, null);
         return "redirect:" + result;
     }
 

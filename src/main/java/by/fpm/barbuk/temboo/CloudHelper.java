@@ -34,4 +34,6 @@ public interface CloudHelper {
     String uploadFile(MultipartFile file, String path, Account account) throws TembooException, IOException, JSONException;
 
     /*Account encrypt(String path, Account account) throws TembooException, IOException, NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException, JSONException;*/
+
+    long getAvailableSize(Account account) throws TembooException, JSONException;
 }

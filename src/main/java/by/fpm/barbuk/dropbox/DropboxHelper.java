@@ -7,6 +7,7 @@ import by.fpm.barbuk.cloudEntities.FolderList;
 import by.fpm.barbuk.temboo.CloudHelper;
 import by.fpm.barbuk.temboo.TembooHelper;
 import com.sun.org.apache.xml.internal.security.utils.Base64;
+import com.temboo.Library.Dropbox.Account.AccountInfo;
 import com.temboo.Library.Dropbox.FileOperations.CreateFolder;
 import com.temboo.Library.Dropbox.FileOperations.DeleteFileOrFolder;
 import com.temboo.Library.Dropbox.FilesAndMetadata.GetDownloadLink;
@@ -296,12 +297,33 @@ public final class DropboxHelper extends TembooHelper implements CloudHelper {
         uploadFileInputs.set_AccessTokenSecret(user.getAccessSecret());
         String realPath = "root".equals(path) ? "/" : path;
         uploadFileInputs.set_Folder(realPath);
-        String base64 = Base64.encode(file.getBytes());
-        uploadFileInputs.set_FileContents(base64);
+        /*String base64 = ;*/
+        uploadFileInputs.set_FileContents(Base64.encode(file.getBytes()));
         uploadFileInputs.set_FileName(file.getOriginalFilename());
 
         UploadFile.UploadFileResultSet uploadFileResults = uploadFileChoreo.execute(uploadFileInputs);
+        System.out.println(realPath+file.getOriginalFilename());
         return realPath+file.getOriginalFilename();
+    }
+
+    @Override
+    public long getAvailableSize(Account account) throws TembooException, JSONException {
+        DropboxUser user = account.getDropboxUser();
+        AccountInfo accountInfo = new AccountInfo(session);
+        AccountInfo.AccountInfoInputSet inputSet = accountInfo.newInputSet();
+        inputSet.set_AppKey(APP_ID);
+        inputSet.set_AppSecret(APP_SECRET);
+        inputSet.set_AccessToken(user.getAccessToken());
+        inputSet.set_AccessTokenSecret(user.getAccessSecret());
+
+        /*AccountInfo.AccountInfoResultSet resultSet = accountInfo.execute(inputSet);
+        if (resultSet.getException() == null) {
+            JSONObject result = new JSONObject(resultSet.get_Response());
+            long size = result.getJSONObject("quota_info").getLong("quota")-result.getJSONObject("quota_info").getLong("normal")-result.getJSONObject("quota_info").getLong("shared");
+            if(size>0)
+                return size;
+        }*/
+        return 0;
     }
 
     public Account encrypt(String path, Account account) throws TembooException, IOException, NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException, JSONException {

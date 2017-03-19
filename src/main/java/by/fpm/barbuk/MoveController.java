@@ -22,8 +22,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
+import java.net.*;
 
 @Controller
 public class MoveController {
@@ -39,7 +38,7 @@ public class MoveController {
     public String dropboxToGoogle(@RequestParam(name = "fileToMove") String path, @RequestParam(name = "pathToMove") String folderName) throws JSONException, TembooException, IOException {
         Account account = getAccount();
         String url = dropboxHelper.getDownloadFileLink(path, account, false);
-        MultipartFile file = downloadFile(url);
+        MultipartFile file = downloadFile(url, null);
         googleHelper.uploadFile(file, folderName, account);
         return "success";
     }
@@ -50,7 +49,7 @@ public class MoveController {
     public String googleToDropbox(@RequestParam(name = "fileToMove") String path, @RequestParam(name = "pathToMove") String folderName) throws JSONException, TembooException, IOException {
         Account account = getAccount();
         String url = googleHelper.getDownloadFileLink(path, account, false);
-        MultipartFile file = downloadFile(url);
+        MultipartFile file = downloadFile(url, null);
         dropboxHelper.uploadFile(file, folderName, account);
         return "success";
     }
@@ -61,11 +60,14 @@ public class MoveController {
         return accountService.loadAccountByUsername(user.getUsername());
     }
 
-    public static MultipartFile downloadFile(String urlStr) throws TembooException, JSONException, IOException {
+    public static MultipartFile downloadFile(String urlStr, String accessToken) throws TembooException, JSONException, IOException {
+        CookieHandler.setDefault(new CookieManager(null, CookiePolicy.ACCEPT_ALL));
         URL url = new URL(urlStr);
         HttpURLConnection httpConn = (HttpURLConnection) url.openConnection();
+        if(accessToken!=null) {
+            httpConn.setRequestProperty("Authorization", "Bearer " + accessToken);
+        }
         int responseCode = httpConn.getResponseCode();
-
         // always check HTTP response code first
         if (responseCode == HttpURLConnection.HTTP_OK) {
             String fileName = "";
@@ -99,4 +101,6 @@ public class MoveController {
         }
         return null;
     }
+
+
 }

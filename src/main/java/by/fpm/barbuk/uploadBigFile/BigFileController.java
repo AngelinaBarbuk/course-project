@@ -3,6 +3,7 @@ package by.fpm.barbuk.uploadBigFile;
 import by.fpm.barbuk.account.Account;
 import by.fpm.barbuk.account.AccountService;
 import com.temboo.core.TembooException;
+import org.apache.commons.io.IOUtils;
 import org.json.JSONException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.annotation.Secured;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.ModelAndView;
 
+import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 
 /**
@@ -36,9 +38,14 @@ public class BigFileController {
 
     @RequestMapping(value = "/bigFile/download", method = RequestMethod.GET)
     @Secured({"ROLE_USER", "ROLE_ADMIN"})
-    public String bigFileDownload(@RequestParam(name = "path") String path) throws JSONException, TembooException, IOException {
-        bigFileHelper.downloadFile(path, getAccount());
-        return "bigFile/bigFile";
+    public void bigFileDownload(@RequestParam(name = "path") String path, HttpServletResponse response) throws JSONException, TembooException, IOException {
+        MultipartFile file = bigFileHelper.downloadFile(path, getAccount());
+        if(file!=null) {
+            response.setContentType(file.getContentType());
+            response.setHeader("Content-Disposition","attachment; filename="+file.getOriginalFilename());
+            IOUtils.copy(file.getInputStream(),response.getOutputStream());
+            response.flushBuffer();
+        }
     }
 
     @RequestMapping(value = "/bigFile/uploadFile", method = RequestMethod.POST)
