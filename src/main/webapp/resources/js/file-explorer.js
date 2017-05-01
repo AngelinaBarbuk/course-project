@@ -62,6 +62,8 @@ $(function () {
                 var data;
                 if (cloudStorage == '/dropbox') {
                     data = {"path": (urlParam('path') + '/' + name.val())};
+                } else if (cloudStorage == '/yandex') {
+                    data = {"path": (urlParam('path') + name.val())};
                 } else if (cloudStorage == '/google') {
                     data = {
                         "path": (urlParam('path')),

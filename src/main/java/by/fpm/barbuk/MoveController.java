@@ -32,39 +32,12 @@ public class MoveController {
     private GoogleHelper googleHelper = new GoogleHelper();
     private CloudHelper dropboxHelper = new DropboxHelper();
 
-    @RequestMapping(value = "/dropbox_to_google", method = RequestMethod.POST)
-    @Secured({"ROLE_USER", "ROLE_ADMIN"})
-    @ResponseBody
-    public String dropboxToGoogle(@RequestParam(name = "fileToMove") String path, @RequestParam(name = "pathToMove") String folderName) throws JSONException, TembooException, IOException {
-        Account account = getAccount();
-        String url = dropboxHelper.getDownloadFileLink(path, account, false);
-        MultipartFile file = downloadFile(url, null);
-        googleHelper.uploadFile(file, folderName, account);
-        return "success";
-    }
-
-    @RequestMapping(value = "/google_to_dropbox", method = RequestMethod.POST)
-    @Secured({"ROLE_USER", "ROLE_ADMIN"})
-    @ResponseBody
-    public String googleToDropbox(@RequestParam(name = "fileToMove") String path, @RequestParam(name = "pathToMove") String folderName) throws JSONException, TembooException, IOException {
-        Account account = getAccount();
-        String url = googleHelper.getDownloadFileLink(path, account, false);
-        MultipartFile file = downloadFile(url, null);
-        dropboxHelper.uploadFile(file, folderName, account);
-        return "success";
-    }
-
-    private Account getAccount() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        User user = (User) authentication.getPrincipal();
-        return accountService.loadAccountByUsername(user.getUsername());
-    }
-
     public static MultipartFile downloadFile(String urlStr, String accessToken) throws TembooException, JSONException, IOException {
         CookieHandler.setDefault(new CookieManager(null, CookiePolicy.ACCEPT_ALL));
         URL url = new URL(urlStr);
         HttpURLConnection httpConn = (HttpURLConnection) url.openConnection();
-        if(accessToken!=null) {
+        /*httpConn.setRequestMethod("GET");*/
+        if (accessToken != null) {
             httpConn.setRequestProperty("Authorization", "Bearer " + accessToken);
         }
         int responseCode = httpConn.getResponseCode();
@@ -100,6 +73,34 @@ public class MoveController {
             return multipartFile;
         }
         return null;
+    }
+
+    @RequestMapping(value = "/dropbox_to_google", method = RequestMethod.POST)
+    @Secured({"ROLE_USER", "ROLE_ADMIN"})
+    @ResponseBody
+    public String dropboxToGoogle(@RequestParam(name = "fileToMove") String path, @RequestParam(name = "pathToMove") String folderName) throws JSONException, TembooException, IOException {
+        Account account = getAccount();
+        String url = dropboxHelper.getDownloadFileLink(path, account, false);
+        MultipartFile file = downloadFile(url, null);
+        googleHelper.uploadFile(file, folderName, account);
+        return "success";
+    }
+
+    @RequestMapping(value = "/google_to_dropbox", method = RequestMethod.POST)
+    @Secured({"ROLE_USER", "ROLE_ADMIN"})
+    @ResponseBody
+    public String googleToDropbox(@RequestParam(name = "fileToMove") String path, @RequestParam(name = "pathToMove") String folderName) throws JSONException, TembooException, IOException {
+        Account account = getAccount();
+        String url = googleHelper.getDownloadFileLink(path, account, false);
+        MultipartFile file = downloadFile(url, null);
+        dropboxHelper.uploadFile(file, folderName, account);
+        return "success";
+    }
+
+    private Account getAccount() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        User user = (User) authentication.getPrincipal();
+        return accountService.loadAccountByUsername(user.getUsername());
     }
 
 

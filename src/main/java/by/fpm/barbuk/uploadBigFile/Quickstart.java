@@ -22,30 +22,37 @@ import java.util.Collections;
 import java.util.List;
 
 public class Quickstart {
-    /** Application name. */
+    /**
+     * Application name.
+     */
     private static final String APPLICATION_NAME =
             "Drive API Java Quickstart";
 
-    /** Directory to store user credentials for this application. */
+    /**
+     * Directory to store user credentials for this application.
+     */
     private static final java.io.File DATA_STORE_DIR = new java.io.File("D:\\googledrive");
-
-    /** Global instance of the {@link FileDataStoreFactory}. */
-    private static FileDataStoreFactory DATA_STORE_FACTORY;
-
-    /** Global instance of the JSON factory. */
+    /**
+     * Global instance of the JSON factory.
+     */
     private static final JsonFactory JSON_FACTORY =
             JacksonFactory.getDefaultInstance();
-
-    /** Global instance of the HTTP transport. */
-    private static HttpTransport HTTP_TRANSPORT;
-
-    /** Global instance of the scopes required by this quickstart.
-     *
+    /**
+     * Global instance of the scopes required by this quickstart.
+     * <p>
      * If modifying these scopes, delete your previously saved credentials
      * at ~/.credentials/drive-java-quickstart
      */
     private static final List<String> SCOPES =
             Arrays.asList(DriveScopes.DRIVE_METADATA_READONLY);
+    /**
+     * Global instance of the {@link FileDataStoreFactory}.
+     */
+    private static FileDataStoreFactory DATA_STORE_FACTORY;
+    /**
+     * Global instance of the HTTP transport.
+     */
+    private static HttpTransport HTTP_TRANSPORT;
 
     static {
         try {
@@ -59,6 +66,7 @@ public class Quickstart {
 
     /**
      * Creates an authorized Credential object.
+     *
      * @return an authorized Credential object.
      * @throws IOException
      */
@@ -72,7 +80,7 @@ public class Quickstart {
 
         // Build flow and trigger user authorization request.
         GoogleAuthorizationCodeFlow flow = new GoogleAuthorizationCodeFlow.Builder(
-                HTTP_TRANSPORT, JSON_FACTORY, GoogleHelper.CLIENT_ID,GoogleHelper.CLIENT_SECRET,
+                HTTP_TRANSPORT, JSON_FACTORY, GoogleHelper.CLIENT_ID, GoogleHelper.CLIENT_SECRET,
                 Collections.singleton(AnalyticsScopes.ANALYTICS_READONLY)).setDataStoreFactory(
                 DATA_STORE_FACTORY).build();
 
@@ -85,6 +93,7 @@ public class Quickstart {
 
     /**
      * Build and return an authorized Drive client service.
+     *
      * @return an authorized Drive client service
      * @throws IOException
      */

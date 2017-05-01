@@ -3,6 +3,7 @@ package by.fpm.barbuk.account;
 import by.fpm.barbuk.dropbox.DropboxUser;
 import by.fpm.barbuk.google.drive.GoogleUser;
 import by.fpm.barbuk.uploadBigFile.UserFiles;
+import by.fpm.barbuk.yandex.YandexUser;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import javax.persistence.*;
@@ -33,8 +34,12 @@ public class Account implements java.io.Serializable {
     @Column(name = "google_user", columnDefinition = "LONGVARBINARY")
     private GoogleUser googleUser;
 
+    @Column(name = "yandex_user", columnDefinition = "LONGVARBINARY")
+    private YandexUser yandexUser;
+
     @Column(name = "user_files", columnDefinition = "LONGVARBINARY")
     private UserFiles userBigFiles = new UserFiles();
+
 
     protected Account() {
 
@@ -101,5 +106,13 @@ public class Account implements java.io.Serializable {
 
     public void setUserBigFiles(UserFiles userBigFiles) {
         this.userBigFiles = userBigFiles;
+    }
+
+    public YandexUser getYandexUser() {
+        return yandexUser;
+    }
+
+    public void setYandexUser(YandexUser yandexUser) {
+        this.yandexUser = yandexUser;
     }
 }

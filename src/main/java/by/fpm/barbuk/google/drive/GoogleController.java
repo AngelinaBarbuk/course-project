@@ -1,6 +1,5 @@
 package by.fpm.barbuk.google.drive;
 
-import by.fpm.barbuk.MoveController;
 import by.fpm.barbuk.account.Account;
 import by.fpm.barbuk.account.AccountService;
 import by.fpm.barbuk.cloudEntities.CloudFolder;
@@ -22,6 +21,8 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.ModelAndView;
 
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 
@@ -35,6 +36,15 @@ public class GoogleController {
 
     private GoogleHelper googleHelper = new GoogleHelper();
     private ObjectMapper mapper = new ObjectMapper();
+
+    public static String getUrl(HttpServletRequest req) {
+        String reqUrl = req.getRequestURL().toString();
+        String queryString = req.getQueryString();   // d=789
+        if (queryString != null) {
+            reqUrl += "?" + queryString;
+        }
+        return reqUrl;
+    }
 
     @ModelAttribute("module")
     String module() {
@@ -75,9 +85,9 @@ public class GoogleController {
 
     @RequestMapping(value = "/google/download", method = RequestMethod.GET)
     @Secured({"ROLE_USER", "ROLE_ADMIN"})
-    public String googleDownload(@RequestParam(name = "path") String path) throws JSONException, TembooException, IOException {
-        String result = googleHelper.getDownloadFileLink(path, getAccount(), true);
-        MoveController.downloadFile(result, null);
+    public String googleDownload(@RequestParam(name = "path", required = false) String path) throws JSONException, TembooException, IOException {
+        String result = googleHelper.getDownloadFileLink(path, getAccount());
+        /*MoveController.downloadFile(result, null);*/
         return "redirect:" + result;
     }
 
@@ -121,15 +131,15 @@ public class GoogleController {
 
     @RequestMapping("/google/OAuth")
     @Secured({"ROLE_USER", "ROLE_ADMIN"})
-    String googleOAuth() {
-        return "redirect:" + googleHelper.getLoginUrl();
+    void googleOAuth(HttpServletResponse response) throws IOException {
+        response.sendRedirect(googleHelper.getLoginUrl());
     }
 
     @RequestMapping("/google/OAuthLogIn")
     @Secured({"ROLE_USER", "ROLE_ADMIN"})
-    String googleOAuthLogin() throws IOException, TembooException, JSONException {
+    String googleOAuthLogin(HttpServletRequest request) throws IOException, TembooException, JSONException {
         Account account = getAccount();
-        GoogleUser googleUser = googleHelper.getUserInfo();
+        GoogleUser googleUser = googleHelper.getUserInfo(getUrl(request));
         if (googleUser != null) {
             account.setGoogleUser(googleUser);
             accountService.updateUsers(account);

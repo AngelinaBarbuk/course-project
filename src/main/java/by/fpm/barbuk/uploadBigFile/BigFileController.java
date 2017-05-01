@@ -40,10 +40,10 @@ public class BigFileController {
     @Secured({"ROLE_USER", "ROLE_ADMIN"})
     public void bigFileDownload(@RequestParam(name = "path") String path, HttpServletResponse response) throws JSONException, TembooException, IOException {
         MultipartFile file = bigFileHelper.downloadFile(path, getAccount());
-        if(file!=null) {
+        if (file != null) {
             response.setContentType(file.getContentType());
-            response.setHeader("Content-Disposition","attachment; filename="+file.getOriginalFilename());
-            IOUtils.copy(file.getInputStream(),response.getOutputStream());
+            response.setHeader("Content-Disposition", "attachment; filename=" + file.getOriginalFilename());
+            IOUtils.copy(file.getInputStream(), response.getOutputStream());
             response.flushBuffer();
         }
     }

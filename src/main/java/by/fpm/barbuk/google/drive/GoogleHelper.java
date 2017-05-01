@@ -1,18 +1,21 @@
 package by.fpm.barbuk.google.drive;
 
-import by.fpm.barbuk.MoveController;
 import by.fpm.barbuk.account.Account;
+import by.fpm.barbuk.account.CloudUser;
 import by.fpm.barbuk.cloudEntities.CloudFile;
 import by.fpm.barbuk.cloudEntities.CloudFolder;
 import by.fpm.barbuk.cloudEntities.FolderList;
 import by.fpm.barbuk.temboo.CloudHelper;
 import by.fpm.barbuk.temboo.TembooHelper;
-import com.sun.org.apache.xml.internal.security.utils.Base64;
-import com.temboo.Library.Google.Drive.Files.Delete;
-import com.temboo.Library.Google.Drive.Files.Get;
-import com.temboo.Library.Google.Drive.Files.Insert;
-import com.temboo.Library.Google.OAuth.FinalizeOAuth;
-import com.temboo.Library.Google.OAuth.InitializeOAuth;
+import com.google.api.client.auth.oauth2.*;
+import com.google.api.client.http.BasicAuthentication;
+import com.google.api.client.http.FileContent;
+import com.google.api.client.http.GenericUrl;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.json.jackson2.JacksonFactory;
+import com.google.api.client.util.store.FileDataStoreFactory;
+import com.google.api.services.drive.Drive;
+import com.google.api.services.drive.model.FileList;
 import com.temboo.core.TembooException;
 import javafx.util.Pair;
 import org.json.JSONArray;
@@ -20,6 +23,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.security.SecureRandom;
@@ -32,35 +36,41 @@ import java.util.Map;
 public final class GoogleHelper extends TembooHelper implements CloudHelper {
 
     public static final String MIME_TYPE_FOLDER = "application/vnd.google-apps.folder";
-    // Provide your dropbox App ID and App Secret.
-    private static final String APP_ID = "mvfavfx9yg4ts62";
-    private static final String APP_SECRET = "2g8wfrnbdpuc1of";
-    // Callback URI that Temboo will redirect to after successful authentication.
-    private static final String FORWARDING_URL = "http://localhost:8080/google/OAuthLogIn";
     public static final String CLIENT_ID = "569486570902-vrcv37j4msm28ucb22024aseesf8s4is.apps.googleusercontent.com";
-    private static final String SCOPE = "https://www.googleapis.com/auth/drive";
     public static final String CLIENT_SECRET = "giRKgPH6v0eCPMDIEhrcKVBh";
+    private static final String FORWARDING_URL = "http://localhost:8080/google/OAuthLogIn";
+    private static final String SCOPE = "https://www.googleapis.com/auth/drive";
     private static Map<String, String> folders = new HashMap<>();
+    private Drive SERVICE;
+
+    public static Drive getDriveService(Credential credential) throws IOException {
+        return new Drive.Builder(
+                new NetHttpTransport(), new JacksonFactory(), credential)
+                .setApplicationName("course")
+                .build();
+    }
+
+    protected AuthorizationCodeFlow initializeFlow() throws IOException {
+        return new AuthorizationCodeFlow.Builder(BearerToken.authorizationHeaderAccessMethod(),
+                new NetHttpTransport(),
+                new JacksonFactory(),
+                new GenericUrl("https://server.example.com/token"),
+                new BasicAuthentication("s6BhdRkqt3", "7Fjfp0ZBr1KtDRbnfVdmIw"),
+                "s6BhdRkqt3",
+                "https://server.example.com/authorize").setCredentialDataStore(
+                StoredCredential.getDefaultDataStore(
+                        new FileDataStoreFactory(new File("datastoredir"))))
+                .build();
+    }
 
     public String getLoginUrl() {
-        String authURL = "";
-        try {
-            /*Drive service  = Quickstart.getDriveService();*/
-            InitializeOAuth initializeOAuthChoreo = new InitializeOAuth(session);
-            InitializeOAuth.InitializeOAuthInputSet initializeOAuthInputs = initializeOAuthChoreo.newInputSet();
+        List<String> scopes = new ArrayList<>();
+        scopes.add(SCOPE);
+        String url = new AuthorizationCodeRequestUrl(
+                "https://accounts.google.com/o/oauth2/v2/auth", CLIENT_ID).setScopes(scopes)
+                .setRedirectUri(FORWARDING_URL).build();
+        return url;
 
-            initializeOAuthInputs.set_Scope(SCOPE);
-            initializeOAuthInputs.set_ClientID(CLIENT_ID);
-            initializeOAuthInputs.set_ForwardingURL(FORWARDING_URL);
-
-            InitializeOAuth.InitializeOAuthResultSet initializeOAuthResults = initializeOAuthChoreo.execute(initializeOAuthInputs);
-            authURL = initializeOAuthResults.get_AuthorizationURL();
-            callbackID = initializeOAuthResults.get_CallbackID();
-            System.out.println("~~~AUTHORIZATION URL: " + authURL);
-        } catch (Exception te) {
-            te.printStackTrace();
-        }
-        return authURL;
     }
 
     private void generateStateToken() {
@@ -72,102 +82,78 @@ public final class GoogleHelper extends TembooHelper implements CloudHelper {
         return stateToken;
     }
 
-    public GoogleUser getUserInfo() throws IOException {
-        try {
-            FinalizeOAuth finalizeOAuthChoreo = new FinalizeOAuth(session);
-            FinalizeOAuth.FinalizeOAuthInputSet finalizeOAuthInputs = finalizeOAuthChoreo.newInputSet();
+    @Override
+    public CloudUser getUserInfo() throws IOException {
+        return null;
+    }
 
-            finalizeOAuthInputs.set_ClientID(CLIENT_ID);
-            finalizeOAuthInputs.set_ClientSecret(CLIENT_SECRET);
-            finalizeOAuthInputs.set_CallbackID(callbackID);
-
-            FinalizeOAuth.FinalizeOAuthResultSet finalizeOAuthResults = finalizeOAuthChoreo.execute(finalizeOAuthInputs);
-            /*Drive service  =Quickstart.getDriveService();*/
-            if (finalizeOAuthResults.getException() == null) {
-                GoogleUser googleUser = new GoogleUser();
-                googleUser.setUserId(finalizeOAuthResults.getId());
-                googleUser.setAccessToken(finalizeOAuthResults.get_AccessToken());
-                googleUser.setRefreshToken(finalizeOAuthResults.get_RefreshToken());
-                finalizeOAuthResults.getOutputs();
-                return googleUser;
-            }
-        } catch (Exception te) {
-            te.printStackTrace();
+    public GoogleUser getUserInfo(String url) throws IOException {
+        AuthorizationCodeResponseUrl authResp = new AuthorizationCodeResponseUrl(url);
+        if (authResp.getError() == null) {
+            String code = authResp.getCode();
+            TokenResponse tokenResponse = new AuthorizationCodeTokenRequest(new NetHttpTransport(), new JacksonFactory(),
+                    new GenericUrl("https://www.googleapis.com/oauth2/v4/token"), code)
+                    .setRedirectUri(FORWARDING_URL)
+                    .setClientAuthentication(new BasicAuthentication(CLIENT_ID, CLIENT_SECRET)).execute();
+            GoogleUser googleUser = new GoogleUser();
+            googleUser.setAccessToken(tokenResponse.getAccessToken());
+            googleUser.setRefreshToken(tokenResponse.getRefreshToken());
+            Credential credential = (Credential) new Credential.Builder(BearerToken.authorizationHeaderAccessMethod())
+                    .setTransport(new NetHttpTransport())
+                    .setJsonFactory(new JacksonFactory())
+                    .setTokenServerUrl(new GenericUrl("https://www.googleapis.com/oauth2/v4/token"))
+                    .setClientAuthentication(new BasicAuthentication(CLIENT_ID, CLIENT_SECRET))
+                    .build()
+                    .setFromTokenResponse(tokenResponse);
+            SERVICE = getDriveService(credential);
+            return googleUser;
         }
         return null;
     }
 
-    private List<Pair<String, String>> getParents(String path, GoogleUser user) throws TembooException, JSONException {
-        com.temboo.Library.Google.Drive.Parents.List listChoreo = new com.temboo.Library.Google.Drive.Parents.List(session);
-        com.temboo.Library.Google.Drive.Parents.List.ListInputSet listInputs = listChoreo.newInputSet();
+    private List<Pair<String, String>> getParents(String path, GoogleUser user) throws TembooException, JSONException, IOException {
 
-        listInputs.set_ClientID(CLIENT_ID);
-        listInputs.set_ClientSecret(CLIENT_SECRET);
-        listInputs.set_AccessToken(user.getAccessToken());
-        listInputs.set_FileID(path);
-// Execute Choreo
-        com.temboo.Library.Google.Drive.Parents.List.ListResultSet listResults = listChoreo.execute(listInputs);
-        String newAccessToken = listResults.get_NewAccessToken();
-        if (newAccessToken != null && !newAccessToken.isEmpty()) {
-            user.setAccessToken(newAccessToken);
-        }
-        JSONObject jsonObject = new JSONObject(listResults.get_Response());
-        JSONArray array = jsonObject.getJSONArray("items");
-        List<Pair<String, String>> pairs = new ArrayList<>();
-        for (int i = 0; i < array.length(); i++) {
-            JSONObject item = array.getJSONObject(i);
-            if (folders.containsKey(item.getString("id"))) {
-                pairs.add(new Pair<>(item.getString("id"), folders.get(item.getString("id"))));
-            } else if (item.getBoolean("isRoot")) {
-                pairs.add(new Pair<>("root", "root"));
+        com.google.api.services.drive.model.File result = SERVICE.files().get(path).setFields("parents").execute();
+        result.getParents();
+        if (result.getParents() != null) {
+            List<Pair<String, String>> pairs = new ArrayList<>();
+            for (String parent : result.getParents()) {
+                if (folders.containsKey(parent)) {
+                    pairs.add(new Pair<>(parent, folders.get(parent)));
+                } else /*if (item.getBoolean("isRoot")) */ {
+                    pairs.add(new Pair<>("root", "root"));
+                }
             }
+            return pairs;
         }
-        return pairs;
+        return new ArrayList<>();
     }
 
     public CloudFolder getFolderContent(String path, Account account) throws TembooException, JSONException, UnsupportedEncodingException {
         GoogleUser user = account.getGoogleUser();
-        com.temboo.Library.Google.Drive.Files.List filesListChoreo = new com.temboo.Library.Google.Drive.Files.List(session);
-        com.temboo.Library.Google.Drive.Files.List.ListInputSet filesListInputs = filesListChoreo.newInputSet();
-
-        filesListInputs.set_ClientID(CLIENT_ID);
-        filesListInputs.set_ClientSecret(CLIENT_SECRET);
-        filesListInputs.set_AccessToken(user.getAccessToken());
-        filesListInputs.setInput("corpus", "domain");
-        filesListInputs.set_MaxResults(1000);
-        filesListInputs.set_Query("'" + path + "' in parents");
-
-        com.temboo.Library.Google.Drive.Files.List.ListResultSet filesListResults = filesListChoreo.execute(filesListInputs);
-        if (filesListResults.getException() == null) {
-            String newAccessToken = filesListResults.get_NewAccessToken();
-            if (newAccessToken != null && !newAccessToken.isEmpty()) {
-                user.setAccessToken(newAccessToken);
-                account.setGoogleUser(user);
-            }
-            JSONObject result = new JSONObject(filesListResults.get_Response());
+        try {
+            FileList result = SERVICE.files().list()
+                    .setCorpus("domain")
+                    .setQ("'" + path + "' in parents")
+                    .execute();
             CloudFolder cloudFolder = new CloudFolder();
             cloudFolder.setCurrentPath(path);
             cloudFolder.setShowName(path);
             cloudFolder.setPath(getParents(path, user));
 
-            JSONArray content = result.getJSONArray("items");
             List<CloudFile> items = new ArrayList<>();
             List<CloudFile> folders = new ArrayList<>();
             List<CloudFile> files = new ArrayList<>();
-            for (int i = 0; i < content.length(); i++) {
+            for (com.google.api.services.drive.model.File file : result.getFiles()) {
                 CloudFile cloudFile = new CloudFile();
-                JSONObject object = content.getJSONObject(i);
-                cloudFile.setPath(object.getString("id"));
-                cloudFile.setShowName(object.getString("title"));
-                cloudFile.setDir(object.getString("mimeType").equals(MIME_TYPE_FOLDER) ? true : false);
-                /*if(!cloudFile.isDir())
-                    cloudFile.setBytes((int) object.getLong("fileSize"));*/
-//                cloudFile.setRoot(object.getString("root"));
+                cloudFile.setPath(file.getId());
+                cloudFile.setShowName(file.getName());
+                cloudFile.setDir(file.getMimeType().equals(MIME_TYPE_FOLDER) ? true : false);
                 if (cloudFile.isDir()) {
                     folders.add(cloudFile);
                     this.folders.put(cloudFile.getPath(), cloudFile.getShowName());
                 } else {
-                    cloudFile.setFileType(object.getString("title").substring(object.getString("title").lastIndexOf(".") + 1));
+                    cloudFile.setFileType(file.getName().substring(file.getName().lastIndexOf(".") + 1));
                     files.add(cloudFile);
                 }
             }
@@ -175,7 +161,10 @@ public final class GoogleHelper extends TembooHelper implements CloudHelper {
             cloudFolder.setFiles(files);
             cloudFolder.setFolders(folders);
             return cloudFolder;
+        } catch (IOException e) {
+            e.printStackTrace();
         }
+
         return new CloudFolder();
     }
 
@@ -192,7 +181,13 @@ public final class GoogleHelper extends TembooHelper implements CloudHelper {
         filesListInputs.set_MaxResults(1000);
         filesListInputs.set_Query("'" + path + "' in parents and mimeType = '" + MIME_TYPE_FOLDER + "'");
         try {
-            com.temboo.Library.Google.Drive.Files.List.ListResultSet filesListResults = filesListChoreo.execute(filesListInputs);
+            com.temboo.Library.Google.Drive.Files.List.ListResultSet filesListResults;
+            try {
+                filesListResults = filesListChoreo.execute(filesListInputs);
+            } catch (TembooException e) {
+                filesListInputs.set_RefreshToken(user.getRefreshToken());
+                filesListResults = filesListChoreo.execute(filesListInputs);
+            }
             if (filesListResults.getException() == null) {
                 String newAccessToken = filesListResults.get_NewAccessToken();
                 if (newAccessToken != null && !newAccessToken.isEmpty()) {
@@ -221,138 +216,80 @@ public final class GoogleHelper extends TembooHelper implements CloudHelper {
             }
         } catch (TembooException ex) {
             System.out.println("empty");
+        } catch (IOException e) {
+            e.printStackTrace();
         }
         return folderList;
     }
 
+    @Override
     public String getDownloadFileLink(String path, Account account, boolean isFileContent) throws TembooException, JSONException {
+        return null;
+    }
+
+    public String getDownloadFileLink(String path, Account account) throws TembooException, JSONException {
         GoogleUser user = account.getGoogleUser();
-        if (!isFileContent) {
-
-            Get getChoreo = new Get(session);
-            Get.GetInputSet getInputs = getChoreo.newInputSet();
-
-            getInputs.set_ClientID(CLIENT_ID);
-            getInputs.set_ClientSecret(CLIENT_SECRET);
-            getInputs.set_AccessToken(user.getAccessToken());
-            getInputs.set_FileID(path);
-        /*if(isFileContent) {
-            getInputs.setInput("alt", "media");
-        }*/
-            Get.GetResultSet getResults = getChoreo.execute(getInputs);
-            String newAccessToken = getResults.get_NewAccessToken();
-            if (newAccessToken != null && !newAccessToken.isEmpty()) {
-                user.setAccessToken(newAccessToken);
-                account.setGoogleUser(user);
-            }
-            JSONObject result = new JSONObject(getResults.get_FileMetadata());
-            System.out.println(result);
-            if (!isFileContent) {
-                if (result.has("exportLinks")) {
-                    JSONObject object = result.getJSONObject("exportLinks");
-                    return object.getString("application/zip");
-                }
-                return result.getString("webContentLink");
-            }
-            return result.getString("downloadUrl");
-        } else {
-            String url = getDownloadFileLink(path, account, false);
-            try {
-                MultipartFile file = MoveController.downloadFile(url, user.getAccessToken());
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+        try {
+            com.google.api.services.drive.model.File file = SERVICE.files().get(path).setFields("webContentLink").execute();
+            return file.getWebContentLink();
+        } catch (IOException e) {
+            e.printStackTrace();
         }
         return "";
     }
 
     public boolean delete(String path, Account account) throws TembooException, JSONException {
         GoogleUser user = account.getGoogleUser();
-        Delete deleteChoreo = new Delete(session);
-        Delete.DeleteInputSet deleteInputs = deleteChoreo.newInputSet();
-
-        deleteInputs.set_ClientID(CLIENT_ID);
-        deleteInputs.set_ClientSecret(CLIENT_SECRET);
-        deleteInputs.set_AccessToken(user.getAccessToken());
-        deleteInputs.set_FileID(path);
-
-        Delete.DeleteResultSet deleteResults = deleteChoreo.execute(deleteInputs);
-        String newAccessToken = deleteResults.get_NewAccessToken();
-        if (newAccessToken != null && !newAccessToken.isEmpty()) {
-            user.setAccessToken(newAccessToken);
-            account.setGoogleUser(user);
+        try {
+            SERVICE.files().delete(path).execute();
+        } catch (IOException e) {
+            e.printStackTrace();
         }
-        return "SUCCESS".equals(deleteResults.getCompletionStatus());
+        return true;
     }
 
     public boolean createFolder(String path, String folderName, Account account) throws TembooException, JSONException {
-        GoogleUser user = account.getGoogleUser();
-        Insert insertChoreo = new Insert(session);
-        Insert.InsertInputSet insertInputs = insertChoreo.newInputSet();
-
-        insertInputs.set_ClientID(CLIENT_ID);
-        insertInputs.set_ClientSecret(CLIENT_SECRET);
-        insertInputs.set_AccessToken(user.getAccessToken());
-
-        JSONObject object = new JSONObject();
-        object.put("title", folderName);
-        object.put("mimeType", MIME_TYPE_FOLDER);
-        if (!path.equals("") && !path.equals("root")) {
-            JSONObject parents = new JSONObject();
-            parents.put("id", path);
-            object.append("parents", parents);
+        try {
+            com.google.api.services.drive.model.File fileMetadata = new com.google.api.services.drive.model.File();
+            fileMetadata.setName(folderName);
+            fileMetadata.setMimeType("application/vnd.google-apps.folder");
+            List<String> parents = new ArrayList<>();
+            parents.add(path);
+            fileMetadata.setParents(parents);
+            com.google.api.services.drive.model.File file = SERVICE.files().create(fileMetadata)
+                    .execute();
+        } catch (IOException e) {
+            e.printStackTrace();
         }
-        insertInputs.set_RequestBody(object.toString());
-        Insert.InsertResultSet insertResults = insertChoreo.execute(insertInputs);
-        String newAccessToken = insertResults.get_NewAccessToken();
-        if (newAccessToken != null && !newAccessToken.isEmpty()) {
-            user.setAccessToken(newAccessToken);
-            account.setGoogleUser(user);
-        }
-        return "SUCCESS".equals(insertResults.getCompletionStatus());
+        return true;
 
     }
 
     public String uploadFile(MultipartFile file, String path, Account account) throws TembooException, IOException, JSONException {
         GoogleUser user = account.getGoogleUser();
-        Insert insertChoreo = new Insert(session);
-        Insert.InsertInputSet insertInputs = insertChoreo.newInputSet();
+        com.google.api.services.drive.model.File fileMetadata = new com.google.api.services.drive.model.File();
+        fileMetadata.setName(file.getOriginalFilename());
+        List<String> parents = new ArrayList<>();
+        parents.add(path);
+        fileMetadata.setParents(parents);
 
-        insertInputs.set_ClientID(CLIENT_ID);
-        insertInputs.set_ClientSecret(CLIENT_SECRET);
-        insertInputs.set_AccessToken(user.getAccessToken());
-
-        JSONObject object = new JSONObject();
-        object.put("title", file.getOriginalFilename());
-        if (!path.equals("") && !path.equals("root")) {
-            JSONObject parents = new JSONObject();
-            parents.put("id", path);
-            object.append("parents", parents);
-        }
-        insertInputs.set_RequestBody(object.toString());
-        /*String base64 = ;*/
-        insertInputs.set_FileContent(Base64.encode(file.getBytes()));
-        if (file.getContentType() != null)
-            insertInputs.set_ContentType(file.getContentType());
-        else
-            insertInputs.set_ContentType("text/plain");
-
-        Insert.InsertResultSet insertResults = insertChoreo.execute(insertInputs);
-
-        String newAccessToken = insertResults.get_NewAccessToken();
-        if (newAccessToken != null && !newAccessToken.isEmpty()) {
-            user.setAccessToken(newAccessToken);
-            account.setGoogleUser(user);
-        }
-        JSONObject result = new JSONObject(insertResults.get_Response());
-        System.out.println(result.getString("id"));
-        return result.getString("id");
+        FileContent mediaContent = new FileContent(file.getContentType(), multipartToFile(file));
+        com.google.api.services.drive.model.File result = SERVICE.files().create(fileMetadata, mediaContent)
+                .set("uploadType", "resumable")
+                .execute();
+        return "";
     }
 
     @Override
     public long getAvailableSize(Account account) {
 
         return 0;
+    }
+
+    public File multipartToFile(MultipartFile multipart) throws IllegalStateException, IOException {
+        File convFile = new File(multipart.getOriginalFilename());
+        multipart.transferTo(convFile);
+        return convFile;
     }
 
 }

@@ -11,8 +11,11 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.SequenceInputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Vector;
 
 public final class BigFileHelper {
 
@@ -43,7 +46,7 @@ public final class BigFileHelper {
                 file.getInputStream().read(content, 0, (int) filepartSize);
             /*System.arraycopy(file.getBytes(), (int) (uploadedSize), content, 0, (int) (filepartSize));*/
                 MultipartFile multipartFile = new MockMultipartFile(getFileName(bigFile, i), getFileName(bigFile, i), file.getContentType(), content);
-                System.out.println(cloud+"   "+filepartSize);
+                System.out.println(cloud + "   " + filepartSize);
                 CloudHelper helper = getHelper(cloud);
                 long size = helper.getAvailableSize(account);
                 filePart.setPath(helper.uploadFile(multipartFile, "root", account));
@@ -51,7 +54,7 @@ public final class BigFileHelper {
                 uploadedSize += filepartSize;
             }
             account.getUserBigFiles().getBigFiles().add(bigFile);
-        }catch (Exception e){
+        } catch (Exception e) {
             System.out.println(e);
         }
     }
@@ -68,25 +71,29 @@ public final class BigFileHelper {
                 break;
             }
         }
+
+        Vector<InputStream> streams = new Vector<>(bigFile.getParts().size());
         if (bigFile != null) {
             long downloadedSize = 0;
-            byte[] fileBytes = new byte[(int) bigFile.getSize()];
+            /*byte[] fileBytes = new byte[(int) bigFile.getSize()];*/
             for (FilePart filePart : bigFile.getParts()) {
                 CloudHelper helper = getHelper(filePart.getCloudName());
                 String link = helper.getDownloadFileLink(filePart.getPath(), account, false);
-                MultipartFile multipartFile = MoveController.downloadFile(link, getAccessToken(filePart.getCloudName(),account));
-                System.arraycopy(multipartFile.getBytes(), 0, fileBytes, (int) downloadedSize, (int) (multipartFile.getSize()));
+                MultipartFile multipartFile = MoveController.downloadFile(link, getAccessToken(filePart.getCloudName(), account));
+                streams.add(multipartFile.getInputStream());
+                /*System.arraycopy(multipartFile.getBytes(), 0, fileBytes, (int) downloadedSize, (int) (multipartFile.getSize()));*/
                 downloadedSize += multipartFile.getSize();
             }
-            if(downloadedSize==bigFile.getSize()){
-                return new MockMultipartFile(bigFile.getFileName()+"."+bigFile.getType(),bigFile.getFileName()+"."+bigFile.getType(),bigFile.getContentType(),fileBytes);
+            if (downloadedSize == bigFile.getSize()) {
+                SequenceInputStream inputStream = new SequenceInputStream(streams.elements());
+                return new MockMultipartFile(bigFile.getFileName() + "." + bigFile.getType(), bigFile.getFileName() + "." + bigFile.getType(), bigFile.getContentType(), inputStream);
             }
         }
         return null;
     }
 
-    private String getAccessToken(String cloud,Account account){
-        if(GOOGLE.equals(cloud)){
+    private String getAccessToken(String cloud, Account account) {
+        if (GOOGLE.equals(cloud)) {
             return account.getGoogleUser().getAccessToken();
         }
         return null;
@@ -116,13 +123,14 @@ public final class BigFileHelper {
     }
 
     private long generatePartSize(long uploadedSize, long fileSize) {
-        if(fileSize<1000)
-            return fileSize-uploadedSize;
-        long size= (long) (Math.random() * Math.min(fileSize/ 4.,50_000_000));
+        if (fileSize < 1000)
+            return fileSize - uploadedSize;
+        /*long size= (long) (Math.random() * Math.min(fileSize/ 4.,50_000_000));
         if(fileSize-uploadedSize<size)
             return fileSize-uploadedSize;
-        return size;
-        /*return Math.min(fileSize-uploadedSize, (long) ( Math.random() * Math.min(fileSize/ 4.,50_000_000)));*/
+        return size;*/
+        long size = Math.min(fileSize - uploadedSize, (long) (Math.random() * Math.min(fileSize / 4., 20_000_000)));
+        return Math.min(size, 13_000_000);
         /*long size = 0;
         if (uploadedSize >= fileSize * 3 / 4) {
             size = fileSize - uploadedSize;

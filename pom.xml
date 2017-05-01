@@ -238,8 +238,18 @@
         <dependency>
             <groupId>com.yandex.android</groupId>
             <artifactId>disk-restapi-sdk</artifactId>
-            <version>1.03</version>
+            <version>RELEASE</version>
         </dependency>
+        <dependency>
+            <groupId>com.dropbox.core</groupId>
+            <artifactId>dropbox-core-sdk</artifactId>
+            <version>2.1.1</version>
+        </dependency>
+        <!--<dependency>
+            <groupId>com.yandex.android</groupId>
+            <artifactId>disk-restapi-sdk</artifactId>
+            <version>1.03</version>
+        </dependency>-->
     </dependencies>
     <build>
         <plugins>

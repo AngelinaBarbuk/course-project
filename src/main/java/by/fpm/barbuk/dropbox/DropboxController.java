@@ -24,6 +24,7 @@ import org.springframework.web.servlet.ModelAndView;
 import javax.crypto.BadPaddingException;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -72,9 +73,9 @@ public class DropboxController {
 
     @RequestMapping(value = "/dropbox/download", method = RequestMethod.GET)
     @Secured({"ROLE_USER", "ROLE_ADMIN"})
-    public String dropboxDownload(@RequestParam(name = "path") String path) throws JSONException, TembooException, IOException {
+    public void dropboxDownload(@RequestParam(name = "path") String path, HttpServletResponse response) throws JSONException, TembooException, IOException {
         String result = dropboxHelper.getDownloadFileLink(path, getAccount(), false);
-        return "redirect:" + result;
+        response.sendRedirect(result);
     }
 
     @RequestMapping(value = "/dropbox/encrypt", method = RequestMethod.GET)
@@ -134,15 +135,17 @@ public class DropboxController {
 
     @RequestMapping("/dropbox/OAuth")
     @Secured({"ROLE_USER", "ROLE_ADMIN"})
-    String dropboxOAuth() {
-        return "redirect:" + dropboxHelper.getLoginUrl();
+    void dropboxOAuth(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        String url = dropboxHelper.getLoginUrl(request);
+        response.sendRedirect(url);
+        /*return "redirect:" + url;*/
     }
 
     @RequestMapping("/dropbox/OAuthLogIn")
     @Secured({"ROLE_USER", "ROLE_ADMIN"})
-    String dropboxOAuthLogin() throws IOException, TembooException, JSONException {
+    String dropboxOAuthLogin(HttpServletRequest request) throws IOException, TembooException, JSONException {
         Account account = getAccount();
-        DropboxUser dropboxUser = dropboxHelper.getUserInfo();
+        DropboxUser dropboxUser = dropboxHelper.getUserInfo(request);
         if (dropboxUser != null) {
             account.setDropboxUser(dropboxUser);
             accountService.updateUsers(account);

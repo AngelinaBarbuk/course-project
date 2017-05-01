@@ -1,20 +1,19 @@
 package by.fpm.barbuk.dropbox;
 
 import by.fpm.barbuk.account.Account;
+import by.fpm.barbuk.account.CloudUser;
 import by.fpm.barbuk.cloudEntities.CloudFile;
 import by.fpm.barbuk.cloudEntities.CloudFolder;
 import by.fpm.barbuk.cloudEntities.FolderList;
 import by.fpm.barbuk.temboo.CloudHelper;
 import by.fpm.barbuk.temboo.TembooHelper;
+import com.dropbox.core.*;
+import com.dropbox.core.v2.DbxClientV2;
+import com.dropbox.core.v2.files.*;
 import com.sun.org.apache.xml.internal.security.utils.Base64;
 import com.temboo.Library.Dropbox.Account.AccountInfo;
-import com.temboo.Library.Dropbox.FileOperations.CreateFolder;
-import com.temboo.Library.Dropbox.FileOperations.DeleteFileOrFolder;
-import com.temboo.Library.Dropbox.FilesAndMetadata.GetDownloadLink;
 import com.temboo.Library.Dropbox.FilesAndMetadata.ListFolderContents;
 import com.temboo.Library.Dropbox.FilesAndMetadata.UploadFile;
-import com.temboo.Library.Dropbox.OAuth.FinalizeOAuth;
-import com.temboo.Library.Dropbox.OAuth.InitializeOAuth;
 import com.temboo.core.TembooException;
 import javafx.util.Pair;
 import org.json.JSONArray;
@@ -24,6 +23,8 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.crypto.*;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpSession;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
@@ -33,7 +34,6 @@ import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 
 
@@ -45,50 +45,27 @@ public final class DropboxHelper extends TembooHelper implements CloudHelper {
 
     // Callback URI that Temboo will redirect to after successful authentication.
     private static final String FORWARDING_URL = "http://localhost:8080/dropbox/OAuthLogIn";
+    DbxAppInfo appInfo = new DbxAppInfo(APP_ID, APP_SECRET);
+    DbxRequestConfig config = new DbxRequestConfig("JavaTutorial/1.0", "utf-8");
+    DbxWebAuth webAuth = new DbxWebAuth(config, appInfo);
+    String sessionKey = "dropbox-auth-csrf-token";
+    DbxSessionStore csrfTokenStore;
+    DbxClientV2 client;
 
+    public String getLoginUrl(HttpServletRequest request) {
+        HttpSession session = request.getSession(true);
+        csrfTokenStore = new DbxStandardSessionStore(session, sessionKey);
+        DbxWebAuth.Request webAuthRequest = DbxWebAuth.newRequestBuilder()
+                .withRedirectUri(FORWARDING_URL, csrfTokenStore)
+                .build();
+        return webAuth.authorize(webAuthRequest);
+    }
 
-    // Replace with your Temboo credentials.
-    /*private static final String TEMBOO_ACCOUNT_NAME = "angelinabarbukyandex";
-    private static final String TEMBOO_APP_KEY_NAME = "myFirstApp";
-    private static final String TEMBOO_APP_KEY_VALUE = "uNiSBe4QkSlOtZ1a7Zozh4sERQfQOdQh";
-
-    private TembooSession session = null;
-
-    private String tokenSecret = "";
-    private String callbackID = "";
-
-    public DropboxHelper() {
-
-        generateStateToken();
-        try {
-            session = new TembooSession(TEMBOO_ACCOUNT_NAME, TEMBOO_APP_KEY_NAME, TEMBOO_APP_KEY_VALUE);
-        } catch (Exception te) {
-            te.printStackTrace();
-        }
-    }*/
 
     @Override
     public String getLoginUrl() {
-
-        String authURL = "";
-        try {
-            InitializeOAuth initializeOAuthChoreo = new InitializeOAuth(session);
-            InitializeOAuth.InitializeOAuthInputSet initializeOAuthInputs = initializeOAuthChoreo.newInputSet();
-            initializeOAuthInputs.set_DropboxAppSecret(APP_SECRET);
-            initializeOAuthInputs.set_DropboxAppKey(APP_ID);
-            /*initializeOAuthInputs.setCredential("course");*/
-            initializeOAuthInputs.set_ForwardingURL(FORWARDING_URL);
-            InitializeOAuth.InitializeOAuthResultSet initializeOAuthResults = initializeOAuthChoreo.execute(initializeOAuthInputs);
-            authURL = initializeOAuthResults.get_AuthorizationURL();
-            tokenSecret = initializeOAuthResults.get_OAuthTokenSecret();
-            callbackID = initializeOAuthResults.get_CallbackID();
-            System.out.println("~~~AUTHORIZATION URL: " + authURL);
-        } catch (Exception te) {
-            te.printStackTrace();
-        }
-        return authURL;
+        return null;
     }
-
 
     @Override
     public String getStateToken() {
@@ -96,28 +73,30 @@ public final class DropboxHelper extends TembooHelper implements CloudHelper {
     }
 
     @Override
-    public DropboxUser getUserInfo() throws IOException {
+    public CloudUser getUserInfo() throws IOException {
+        return null;
+    }
+
+    public DropboxUser getUserInfo(HttpServletRequest request) throws IOException {
         try {
-            FinalizeOAuth finalizeOAuthChoreo = new FinalizeOAuth(session);
-            FinalizeOAuth.FinalizeOAuthInputSet finalizeOAuthInputs = finalizeOAuthChoreo.newInputSet();
-
-            finalizeOAuthInputs.set_OAuthTokenSecret(tokenSecret);
-            finalizeOAuthInputs.set_DropboxAppSecret(APP_SECRET);
-            finalizeOAuthInputs.set_DropboxAppKey(APP_ID);
-            finalizeOAuthInputs.set_CallbackID(callbackID);
-
-            FinalizeOAuth.FinalizeOAuthResultSet finalizeOAuthResults = finalizeOAuthChoreo.execute(finalizeOAuthInputs);
-            if (finalizeOAuthResults.getException() == null) {
-                DropboxUser dropboxUser = new DropboxUser();
-                dropboxUser.setUserId(finalizeOAuthResults.get_UserID());
-                dropboxUser.setAccessToken(finalizeOAuthResults.get_AccessToken());
-                dropboxUser.setAccessSecret(finalizeOAuthResults.get_AccessTokenSecret());
-                finalizeOAuthResults.getOutputs();
-                dropboxUser.setEncryptionKeys(new HashMap<>());
-                return dropboxUser;
-            }
-        } catch (Exception te) {
-            te.printStackTrace();
+            DbxAuthFinish authFinish = webAuth.finishFromRedirect(FORWARDING_URL, csrfTokenStore, request.getParameterMap());
+            client = new DbxClientV2(config, authFinish.getAccessToken());
+            DropboxUser dropboxUser = new DropboxUser();
+            dropboxUser.setAccessToken(authFinish.getAccessToken());
+            dropboxUser.setUserId(authFinish.getUserId());
+            return dropboxUser;
+        } catch (DbxException e) {
+            e.printStackTrace();
+        } catch (DbxWebAuth.BadRequestException e) {
+            e.printStackTrace();
+        } catch (DbxWebAuth.ProviderException e) {
+            e.printStackTrace();
+        } catch (DbxWebAuth.NotApprovedException e) {
+            e.printStackTrace();
+        } catch (DbxWebAuth.CsrfException e) {
+            e.printStackTrace();
+        } catch (DbxWebAuth.BadStateException e) {
+            e.printStackTrace();
         }
         return null;
     }
@@ -125,22 +104,12 @@ public final class DropboxHelper extends TembooHelper implements CloudHelper {
     @Override
     public CloudFolder getFolderContent(String path, Account account) throws TembooException, JSONException, UnsupportedEncodingException {
         DropboxUser user = account.getDropboxUser();
-        ListFolderContents listFolderContentsChoreo = new ListFolderContents(session);
-        ListFolderContents.ListFolderContentsInputSet listFolderContentsInputs = listFolderContentsChoreo.newInputSet();
-
-        listFolderContentsInputs.set_AppKey(APP_ID);
-        listFolderContentsInputs.set_AppSecret(APP_SECRET);
-        listFolderContentsInputs.set_AccessToken(user.getAccessToken());
-        listFolderContentsInputs.set_AccessTokenSecret(user.getAccessSecret());
-        listFolderContentsInputs.set_Folder("root".equals(path) ? "" : path);
-
-        ListFolderContents.ListFolderContentsResultSet listFolderContentsResults = listFolderContentsChoreo.execute(listFolderContentsInputs);
-        if (listFolderContentsResults.getException() == null) {
-            JSONObject result = new JSONObject(listFolderContentsResults.get_Response());
+        try {
+            ListFolderResult listResult = client.files().listFolder("root".equals(path) ? "" : path);
             CloudFolder cloudFolder = new CloudFolder();
 
             List<Pair<String, String>> folderPathList = new ArrayList<>();
-            String[] folderPath = result.getString("path").split("/");
+            String[] folderPath = path.split("/");
             if (folderPath.length >= 2) {
                 folderPathList.add(new Pair("root", "root"));
             }
@@ -151,46 +120,66 @@ public final class DropboxHelper extends TembooHelper implements CloudHelper {
                 folderPathList.add(new Pair(sb.toString(), folderPath[i - 1]));
             }
             cloudFolder.setPath(folderPathList);
-            cloudFolder.setCurrentPath(result.getString("path"));
-            cloudFolder.setShowName(result.getString("path").substring(cloudFolder.getPath().lastIndexOf("/") + 1));
-            cloudFolder.setSize(result.getString("size"));
-            cloudFolder.setDir(result.getBoolean("is_dir"));
-            cloudFolder.setBytes(result.getInt("bytes"));
-            cloudFolder.setRoot(result.getString("root"));
-            JSONArray content = result.getJSONArray("contents");
+            cloudFolder.setCurrentPath(path);
+            cloudFolder.setSize("0");
+            cloudFolder.setDir(true);
+            cloudFolder.setBytes(0);
             List<CloudFile> items = new ArrayList<>();
             List<CloudFile> folders = new ArrayList<>();
             List<CloudFile> files = new ArrayList<>();
-            for (int i = 0; i < content.length(); i++) {
-                CloudFile cloudFile = new CloudFile();
-                JSONObject object = content.getJSONObject(i);
-                cloudFile.setRev(object.getString("rev"));
-                cloudFile.setPath(object.getString("path"));
-                cloudFile.setShowName(cloudFile.getPath().substring(cloudFile.getPath().lastIndexOf("/") + 1));
-                cloudFile.setSize(object.getString("size"));
-                cloudFile.setReadOnly(object.getBoolean("read_only"));
-                cloudFile.setDir(object.getBoolean("is_dir"));
-                cloudFile.setBytes(object.getInt("bytes"));
-                cloudFile.setRoot(object.getString("root"));
-                items.add(cloudFile);
-                if (cloudFile.isDir())
-                    folders.add(cloudFile);
-                else {
-                    cloudFile.setFileType(cloudFile.getPath().substring(cloudFile.getPath().lastIndexOf(".") + 1));
-                    files.add(cloudFile);
+            while (true) {
+                for (Metadata metadata : listResult.getEntries()) {
+                    if (metadata instanceof FileMetadata) {
+                        FileMetadata fileMetadata = (FileMetadata) metadata;
+                        CloudFile cloudFile = new CloudFile();
+                        cloudFile.setRev(fileMetadata.getRev());
+                        cloudFile.setPath(fileMetadata.getPathDisplay());
+                        cloudFile.setShowName(fileMetadata.getName());
+                        cloudFile.setSize(String.valueOf(fileMetadata.getSize()));
+                        cloudFile.setDir(false);
+                        cloudFile.setBytes((int) fileMetadata.getSize());
+                        cloudFile.setRoot(path);
+                        items.add(cloudFile);
+                        cloudFile.setFileType(cloudFile.getPath().substring(cloudFile.getPath().lastIndexOf(".") + 1));
+                        files.add(cloudFile);
+
+                    } else if (metadata instanceof FolderMetadata) {
+                        FolderMetadata folderMetadata = (FolderMetadata) metadata;
+                        CloudFile cloudFile = new CloudFile();
+                        cloudFile.setPath(folderMetadata.getPathDisplay());
+                        cloudFile.setShowName(folderMetadata.getName());
+                        cloudFile.setDir(true);
+                        cloudFile.setRoot(path);
+                        items.add(cloudFile);
+                        folders.add(cloudFile);
+                    }
                 }
+
+                if (!listResult.getHasMore()) {
+                    break;
+                }
+
+                listResult = client.files().listFolderContinue(listResult.getCursor());
             }
             cloudFolder.setContent(items);
             cloudFolder.setFiles(files);
             cloudFolder.setFolders(folders);
             return cloudFolder;
+        } catch (ListFolderErrorException e) {
+            e.printStackTrace();
+        } catch (ListFolderContinueErrorException e) {
+            e.printStackTrace();
+        } catch (DbxException e) {
+            e.printStackTrace();
         }
         return new CloudFolder();
+
     }
 
 
     @Override
-    public FolderList getFolders(String path, Account account) throws TembooException, JSONException, UnsupportedEncodingException {
+    public FolderList getFolders(String path, Account account) throws
+            TembooException, JSONException, UnsupportedEncodingException {
         DropboxUser user = account.getDropboxUser();
         FolderList folderList = new FolderList();
         ListFolderContents listFolderContentsChoreo = new ListFolderContents(session);
@@ -240,70 +229,45 @@ public final class DropboxHelper extends TembooHelper implements CloudHelper {
     @Override
     public String getDownloadFileLink(String path, Account account, boolean isFileContent) throws TembooException {
         DropboxUser user = account.getDropboxUser();
-        GetDownloadLink getDownloadLinkChoreo = new GetDownloadLink(session);
-        GetDownloadLink.GetDownloadLinkInputSet getDownloadLinkInputs = getDownloadLinkChoreo.newInputSet();
-
-        getDownloadLinkInputs.set_AppKey(APP_ID);
-        getDownloadLinkInputs.set_AppSecret(APP_SECRET);
-        getDownloadLinkInputs.set_AccessToken(user.getAccessToken());
-        getDownloadLinkInputs.set_AccessTokenSecret(user.getAccessSecret());
-        getDownloadLinkInputs.set_Path(path);
-
-        GetDownloadLink.GetDownloadLinkResultSet getDownloadLinkResults = getDownloadLinkChoreo.execute(getDownloadLinkInputs);
-        return getDownloadLinkResults.get_URL();
+        try {
+            GetTemporaryLinkResult result = client.files().getTemporaryLink(path);
+            return result.getLink();
+        } catch (DbxException e) {
+            e.printStackTrace();
+        }
+        return "";
     }
 
     @Override
     public boolean delete(String path, Account account) throws TembooException, JSONException {
-        DropboxUser user = account.getDropboxUser();
-        DeleteFileOrFolder deleteFileOrFolderChoreo = new DeleteFileOrFolder(session);
-        DeleteFileOrFolder.DeleteFileOrFolderInputSet deleteFileOrFolderInputs = deleteFileOrFolderChoreo.newInputSet();
-
-        deleteFileOrFolderInputs.set_AppKey(APP_ID);
-        deleteFileOrFolderInputs.set_AppSecret(APP_SECRET);
-        deleteFileOrFolderInputs.set_AccessToken(user.getAccessToken());
-        deleteFileOrFolderInputs.set_AccessTokenSecret(user.getAccessSecret());
-        deleteFileOrFolderInputs.set_Path(path);
-
-        DeleteFileOrFolder.DeleteFileOrFolderResultSet deleteFileOrFolderResults = deleteFileOrFolderChoreo.execute(deleteFileOrFolderInputs);
-        JSONObject result = new JSONObject(deleteFileOrFolderResults.get_Response());
-        return result.getBoolean("is_deleted");
+        try {
+            client.files().delete(path);
+            return true;
+        } catch (DbxException e) {
+            e.printStackTrace();
+        }
+        return false;
     }
 
     public boolean createFolder(String path, Account account) throws TembooException {
-        DropboxUser user = account.getDropboxUser();
-        CreateFolder createFolderChoreo = new CreateFolder(session);
-        CreateFolder.CreateFolderInputSet createFolderInputs = createFolderChoreo.newInputSet();
-
-        createFolderInputs.set_AppKey(APP_ID);
-        createFolderInputs.set_AppSecret(APP_SECRET);
-        createFolderInputs.set_AccessToken(user.getAccessToken());
-        createFolderInputs.set_AccessTokenSecret(user.getAccessSecret());
-        createFolderInputs.set_NewFolderName(path);
-
-        CreateFolder.CreateFolderResultSet createFolderResults = createFolderChoreo.execute(createFolderInputs);
+        try {
+            client.files().createFolder(path);
+        } catch (DbxException e) {
+            e.printStackTrace();
+        }
         return true;
     }
 
     @Override
     public String uploadFile(MultipartFile file, String path, Account account) throws TembooException, IOException {
         DropboxUser user = account.getDropboxUser();
-        UploadFile uploadFileChoreo = new UploadFile(session);
-        UploadFile.UploadFileInputSet uploadFileInputs = uploadFileChoreo.newInputSet();
-
-        uploadFileInputs.set_AppKey(APP_ID);
-        uploadFileInputs.set_AppSecret(APP_SECRET);
-        uploadFileInputs.set_AccessToken(user.getAccessToken());
-        uploadFileInputs.set_AccessTokenSecret(user.getAccessSecret());
-        String realPath = "root".equals(path) ? "/" : path;
-        uploadFileInputs.set_Folder(realPath);
-        /*String base64 = ;*/
-        uploadFileInputs.set_FileContents(Base64.encode(file.getBytes()));
-        uploadFileInputs.set_FileName(file.getOriginalFilename());
-
-        UploadFile.UploadFileResultSet uploadFileResults = uploadFileChoreo.execute(uploadFileInputs);
-        System.out.println(realPath+file.getOriginalFilename());
-        return realPath+file.getOriginalFilename();
+        try {
+            client.files().upload(("root".equals(path) ? "" : path) + "/" + file.getOriginalFilename()).uploadAndFinish(file.getInputStream());
+            return ("root".equals(path) ? "" : path) + "/" + file.getOriginalFilename();
+        } catch (DbxException e) {
+            e.printStackTrace();
+        }
+        return "";
     }
 
     @Override
