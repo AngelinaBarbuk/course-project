@@ -13,7 +13,7 @@ public class CloudFile implements Serializable {
     private boolean readOnly;
     private boolean isDir;
     private String rev;
-    private int bytes;
+    private long bytes;
     private String fileType;
 
     public String getRoot() {
@@ -72,12 +72,13 @@ public class CloudFile implements Serializable {
         this.rev = rev;
     }
 
-    public int getBytes() {
+    public long getBytes() {
         return bytes;
     }
 
-    public void setBytes(int bytes) {
+    public void setBytes(long bytes) {
         this.bytes = bytes;
+        setSize(SizeMapper.mapSize(bytes));
     }
 
     public String getFileType() {

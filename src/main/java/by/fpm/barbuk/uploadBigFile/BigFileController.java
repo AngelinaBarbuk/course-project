@@ -11,10 +11,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.ModelAttribute;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.ModelAndView;
 
@@ -28,8 +25,8 @@ import java.io.IOException;
 public class BigFileController {
     @Autowired
     private AccountService accountService;
-
-    private BigFileHelper bigFileHelper = new BigFileHelper();
+    @Autowired
+    private BigFileHelper bigFileHelper;
 
     @ModelAttribute("module")
     String module() {
@@ -57,6 +54,14 @@ public class BigFileController {
         account.setUserBigFiles(userFiles);
         accountService.updateUsers(account);
         return "redirect:/bigFile";
+    }
+
+    @RequestMapping(value = "/bigFile/delete", method = RequestMethod.DELETE)
+    @Secured({"ROLE_USER", "ROLE_ADMIN"})
+    @ResponseBody
+    public String delete(@RequestParam(name = "path") String path) throws JSONException, TembooException, IOException {
+        boolean result = bigFileHelper.delete(path, getAccount());
+        return "success";
     }
 
     private Account getAccount() {

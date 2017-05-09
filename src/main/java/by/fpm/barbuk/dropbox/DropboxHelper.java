@@ -1,56 +1,51 @@
 package by.fpm.barbuk.dropbox;
 
 import by.fpm.barbuk.account.Account;
-import by.fpm.barbuk.account.CloudUser;
 import by.fpm.barbuk.cloudEntities.CloudFile;
 import by.fpm.barbuk.cloudEntities.CloudFolder;
-import by.fpm.barbuk.cloudEntities.FolderList;
-import by.fpm.barbuk.temboo.CloudHelper;
 import by.fpm.barbuk.temboo.TembooHelper;
+import by.fpm.barbuk.uploadBigFile.DownloadUploadFile;
 import com.dropbox.core.*;
 import com.dropbox.core.v2.DbxClientV2;
 import com.dropbox.core.v2.files.*;
-import com.sun.org.apache.xml.internal.security.utils.Base64;
-import com.temboo.Library.Dropbox.Account.AccountInfo;
-import com.temboo.Library.Dropbox.FilesAndMetadata.ListFolderContents;
-import com.temboo.Library.Dropbox.FilesAndMetadata.UploadFile;
 import com.temboo.core.TembooException;
 import javafx.util.Pair;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
+import org.springframework.context.annotation.Scope;
+import org.springframework.context.annotation.ScopedProxyMode;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
-import javax.crypto.*;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.UnsupportedEncodingException;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.List;
 
 
-public final class DropboxHelper extends TembooHelper implements CloudHelper {
+@Component
+@Scope(value = "session", proxyMode = ScopedProxyMode.TARGET_CLASS)
+public class DropboxHelper extends TembooHelper implements DownloadUploadFile {
 
     // Provide your dropbox App ID and App Secret.
     private static final String APP_ID = "mvfavfx9yg4ts62";
     private static final String APP_SECRET = "2g8wfrnbdpuc1of";
 
-    // Callback URI that Temboo will redirect to after successful authentication.
     private static final String FORWARDING_URL = "http://localhost:8080/dropbox/OAuthLogIn";
-    DbxAppInfo appInfo = new DbxAppInfo(APP_ID, APP_SECRET);
-    DbxRequestConfig config = new DbxRequestConfig("JavaTutorial/1.0", "utf-8");
-    DbxWebAuth webAuth = new DbxWebAuth(config, appInfo);
-    String sessionKey = "dropbox-auth-csrf-token";
-    DbxSessionStore csrfTokenStore;
-    DbxClientV2 client;
+    private static final String sessionKey = "dropbox-auth-csrf-token";
+    private static final DbxRequestConfig config = new DbxRequestConfig("JavaTutorial/1.0", "utf-8");
+    private DbxAppInfo appInfo = new DbxAppInfo(APP_ID, APP_SECRET);
+    private DbxWebAuth webAuth = new DbxWebAuth(config, appInfo);
+    private DbxSessionStore csrfTokenStore;
+    private DbxClientV2 client;
+
+    private static final long CHUNKED_UPLOAD_CHUNK_SIZE = 8L << 20; // 8MiB
+    private static final int CHUNKED_UPLOAD_MAX_ATTEMPTS = 5;
+
+    public DropboxHelper() {
+
+    }
 
     public String getLoginUrl(HttpServletRequest request) {
         HttpSession session = request.getSession(true);
@@ -61,26 +56,10 @@ public final class DropboxHelper extends TembooHelper implements CloudHelper {
         return webAuth.authorize(webAuthRequest);
     }
 
-
-    @Override
-    public String getLoginUrl() {
-        return null;
-    }
-
-    @Override
-    public String getStateToken() {
-        return stateToken;
-    }
-
-    @Override
-    public CloudUser getUserInfo() throws IOException {
-        return null;
-    }
-
     public DropboxUser getUserInfo(HttpServletRequest request) throws IOException {
         try {
             DbxAuthFinish authFinish = webAuth.finishFromRedirect(FORWARDING_URL, csrfTokenStore, request.getParameterMap());
-            client = new DbxClientV2(config, authFinish.getAccessToken());
+            setClient(new DbxClientV2(config, authFinish.getAccessToken()));
             DropboxUser dropboxUser = new DropboxUser();
             dropboxUser.setAccessToken(authFinish.getAccessToken());
             dropboxUser.setUserId(authFinish.getUserId());
@@ -101,11 +80,22 @@ public final class DropboxHelper extends TembooHelper implements CloudHelper {
         return null;
     }
 
-    @Override
-    public CloudFolder getFolderContent(String path, Account account) throws TembooException, JSONException, UnsupportedEncodingException {
+    public boolean authorize(Account account) {
+        try {
+            DropboxUser user = account.getDropboxUser();
+            setClient(new DbxClientV2(config, user.getAccessToken()));
+            client.users().getSpaceUsage();
+            return true;
+        } catch (DbxException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    public CloudFolder getFolderContent(String path, Account account) {
         DropboxUser user = account.getDropboxUser();
         try {
-            ListFolderResult listResult = client.files().listFolder("root".equals(path) ? "" : path);
+            ListFolderResult listResult = client.files().listFolder(getPath(path));
             CloudFolder cloudFolder = new CloudFolder();
 
             List<Pair<String, String>> folderPathList = new ArrayList<>();
@@ -135,12 +125,12 @@ public final class DropboxHelper extends TembooHelper implements CloudHelper {
                         cloudFile.setRev(fileMetadata.getRev());
                         cloudFile.setPath(fileMetadata.getPathDisplay());
                         cloudFile.setShowName(fileMetadata.getName());
-                        cloudFile.setSize(String.valueOf(fileMetadata.getSize()));
                         cloudFile.setDir(false);
-                        cloudFile.setBytes((int) fileMetadata.getSize());
+                        cloudFile.setBytes(fileMetadata.getSize());
                         cloudFile.setRoot(path);
                         items.add(cloudFile);
-                        cloudFile.setFileType(cloudFile.getPath().substring(cloudFile.getPath().lastIndexOf(".") + 1));
+                        cloudFile.setFileType(cloudFile.getPath()
+                                .substring(cloudFile.getPath().lastIndexOf(".") + 1));
                         files.add(cloudFile);
 
                     } else if (metadata instanceof FolderMetadata) {
@@ -176,10 +166,12 @@ public final class DropboxHelper extends TembooHelper implements CloudHelper {
 
     }
 
+    private String getPath(String path) {
+        return "root".equals(path) ? "" : path;
+    }
 
-    @Override
-    public FolderList getFolders(String path, Account account) throws
-            TembooException, JSONException, UnsupportedEncodingException {
+
+    /*public FolderList getFolders(String path, Account account) {
         DropboxUser user = account.getDropboxUser();
         FolderList folderList = new FolderList();
         ListFolderContents listFolderContentsChoreo = new ListFolderContents(session);
@@ -224,10 +216,9 @@ public final class DropboxHelper extends TembooHelper implements CloudHelper {
             return folderList;
         }
         return folderList;
-    }
+    }*/
 
-    @Override
-    public String getDownloadFileLink(String path, Account account, boolean isFileContent) throws TembooException {
+    public String getDownloadFileLink(String path, Account account) {
         DropboxUser user = account.getDropboxUser();
         try {
             GetTemporaryLinkResult result = client.files().getTemporaryLink(path);
@@ -239,7 +230,7 @@ public final class DropboxHelper extends TembooHelper implements CloudHelper {
     }
 
     @Override
-    public boolean delete(String path, Account account) throws TembooException, JSONException {
+    public boolean delete(String path, Account account) {
         try {
             client.files().delete(path);
             return true;
@@ -259,43 +250,87 @@ public final class DropboxHelper extends TembooHelper implements CloudHelper {
     }
 
     @Override
-    public String uploadFile(MultipartFile file, String path, Account account) throws TembooException, IOException {
+    public String uploadFile(MultipartFile file, String path, Account account) {
         DropboxUser user = account.getDropboxUser();
-        try {
-            client.files().upload(("root".equals(path) ? "" : path) + "/" + file.getOriginalFilename()).uploadAndFinish(file.getInputStream());
-            return ("root".equals(path) ? "" : path) + "/" + file.getOriginalFilename();
-        } catch (DbxException e) {
-            e.printStackTrace();
+        long size = file.getSize();
+        if (size < CHUNKED_UPLOAD_CHUNK_SIZE) {
+            try {
+                FileMetadata fileMetadata = client.files()
+                        .uploadBuilder((getPath(path)) + "/" + file.getOriginalFilename())
+                        .withMode(WriteMode.ADD)
+                        .uploadAndFinish(file.getInputStream());
+                return fileMetadata.getName();
+            } catch (DbxException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        long uploaded = 0L;
+
+        String sessionId = null;
+        for (int i = 0; i < CHUNKED_UPLOAD_MAX_ATTEMPTS; ++i) {
+
+            try (InputStream in = file.getInputStream()) {
+                in.skip(uploaded);
+                // (1) Start
+                if (sessionId == null) {
+                    sessionId = client.files().uploadSessionStart()
+                            .uploadAndFinish(in, CHUNKED_UPLOAD_CHUNK_SIZE)
+                            .getSessionId();
+                    uploaded += CHUNKED_UPLOAD_CHUNK_SIZE;
+                }
+                UploadSessionCursor cursor = new UploadSessionCursor(sessionId, uploaded);
+                // (2) Append
+                while ((size - uploaded) > CHUNKED_UPLOAD_CHUNK_SIZE) {
+                    client.files().uploadSessionAppendV2(cursor)
+                            .uploadAndFinish(in, CHUNKED_UPLOAD_CHUNK_SIZE);
+                    uploaded += CHUNKED_UPLOAD_CHUNK_SIZE;
+                    cursor = new UploadSessionCursor(sessionId, uploaded);
+                }
+                // (3) Finish
+                long remaining = size - uploaded;
+                CommitInfo commitInfo = CommitInfo.newBuilder((getPath(path)) + "/" + file.getOriginalFilename())
+                        .withMode(WriteMode.ADD)
+                        .build();
+                FileMetadata metadata = client.files().uploadSessionFinish(cursor, commitInfo)
+                        .uploadAndFinish(in, remaining);
+                System.out.println(metadata.toStringMultiline());
+                return metadata.getName();
+            } catch (RetryException ex) {
+                continue;
+            } catch (NetworkIOException ex) {
+                // network issue with Dropbox (maybe a timeout?) try again
+                continue;
+            } catch (UploadSessionLookupErrorException ex) {
+                if (ex.errorValue.isIncorrectOffset()) {
+                    uploaded = ex.errorValue
+                            .getIncorrectOffsetValue()
+                            .getCorrectOffset();
+                    continue;
+                }
+            } catch (UploadSessionFinishErrorException ex) {
+                if (ex.errorValue.isLookupFailed() && ex.errorValue.getLookupFailedValue().isIncorrectOffset()) {
+                    uploaded = ex.errorValue
+                            .getLookupFailedValue()
+                            .getIncorrectOffsetValue()
+                            .getCorrectOffset();
+                    continue;
+                }
+            } catch (DbxException ex) {
+
+            } catch (IOException ex) {
+            }
         }
         return "";
     }
 
-    @Override
-    public long getAvailableSize(Account account) throws TembooException, JSONException {
-        DropboxUser user = account.getDropboxUser();
-        AccountInfo accountInfo = new AccountInfo(session);
-        AccountInfo.AccountInfoInputSet inputSet = accountInfo.newInputSet();
-        inputSet.set_AppKey(APP_ID);
-        inputSet.set_AppSecret(APP_SECRET);
-        inputSet.set_AccessToken(user.getAccessToken());
-        inputSet.set_AccessTokenSecret(user.getAccessSecret());
-
-        /*AccountInfo.AccountInfoResultSet resultSet = accountInfo.execute(inputSet);
-        if (resultSet.getException() == null) {
-            JSONObject result = new JSONObject(resultSet.get_Response());
-            long size = result.getJSONObject("quota_info").getLong("quota")-result.getJSONObject("quota_info").getLong("normal")-result.getJSONObject("quota_info").getLong("shared");
-            if(size>0)
-                return size;
-        }*/
-        return 0;
-    }
-
-    public Account encrypt(String path, Account account) throws TembooException, IOException, NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException, JSONException {
+    /*public Account encrypt(String path, Account account) throws TembooException, IOException, NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException, JSONException {
         DropboxUser dropboxUser = account.getDropboxUser();
         try {
 
 
-            String urlStr = getDownloadFileLink(path, account, false);
+            String urlStr = getDownloadFileLink(path, account);
             URL url = new URL(urlStr);
             HttpURLConnection httpConn = (HttpURLConnection) url.openConnection();
             int responseCode = httpConn.getResponseCode();
@@ -337,7 +372,7 @@ public final class DropboxHelper extends TembooHelper implements CloudHelper {
                 uploadFileInputs.set_AppSecret(APP_SECRET);
                 uploadFileInputs.set_AccessToken(dropboxUser.getAccessToken());
                 uploadFileInputs.set_AccessTokenSecret(dropboxUser.getAccessSecret());
-                uploadFileInputs.set_Folder("root".equals(path) ? "" : path);
+                uploadFileInputs.set_Folder(getPath(path));
                 if (!dropboxUser.getEncryptionKeys().containsKey(path)) {
                     KeyGenerator keyGen = KeyGenerator.getInstance("AES");
                     SecureRandom random = new SecureRandom();
@@ -368,5 +403,40 @@ public final class DropboxHelper extends TembooHelper implements CloudHelper {
             System.out.println("err");
         }
         return account;
+    }*/
+
+    @Override
+    public MultipartFile downloadFile(String path, Account account) {
+        InputStream in = null;
+        try {
+            in = client.files().download(getPath(path)).getInputStream();
+            FileMetadata metadata = (FileMetadata) client.files().getMetadata(getPath(path));
+            if (in != null) {
+                MultipartFile multipartFile = new MockMultipartFile(metadata.getName(), in);
+                return multipartFile;
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (DownloadErrorException e) {
+            e.printStackTrace();
+        } catch (DbxException e) {
+            e.printStackTrace();
+        } finally {
+            if (in != null)
+                try {
+                    in.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+        }
+        return null;
+    }
+
+    public DbxClientV2 getClient() {
+        return client;
+    }
+
+    public void setClient(DbxClientV2 client) {
+        this.client = client;
     }
 }

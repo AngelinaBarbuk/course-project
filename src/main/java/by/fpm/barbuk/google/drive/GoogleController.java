@@ -3,7 +3,6 @@ package by.fpm.barbuk.google.drive;
 import by.fpm.barbuk.account.Account;
 import by.fpm.barbuk.account.AccountService;
 import by.fpm.barbuk.cloudEntities.CloudFolder;
-import by.fpm.barbuk.cloudEntities.FolderList;
 import by.fpm.barbuk.support.web.AjaxRequestBody;
 import by.fpm.barbuk.support.web.AjaxResponseBody;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -33,8 +32,8 @@ import java.io.UnsupportedEncodingException;
 public class GoogleController {
     @Autowired
     private AccountService accountService;
-
-    private GoogleHelper googleHelper = new GoogleHelper();
+    @Autowired
+    private GoogleHelper googleHelper;
     private ObjectMapper mapper = new ObjectMapper();
 
     public static String getUrl(HttpServletRequest req) {
@@ -75,14 +74,14 @@ public class GoogleController {
         return modelAndView;
     }
 
-    @RequestMapping(value = "/google/getFolders", method = RequestMethod.GET)
+    /*@RequestMapping(value = "/google/getFolders", method = RequestMethod.GET)
     @Secured({"ROLE_USER", "ROLE_ADMIN"})
     @ResponseBody
     public FolderList dropboxGetFolders(@RequestParam(name = "path") String path) throws JSONException, TembooException, IOException {
         FolderList result = googleHelper.getFolders(path, getAccount());
         return result;
     }
-
+*/
     @RequestMapping(value = "/google/download", method = RequestMethod.GET)
     @Secured({"ROLE_USER", "ROLE_ADMIN"})
     public String googleDownload(@RequestParam(name = "path", required = false) String path) throws JSONException, TembooException, IOException {
@@ -124,9 +123,18 @@ public class GoogleController {
     @Secured({"ROLE_USER", "ROLE_ADMIN"})
     String google() {
         Account account = getAccount();
+        if (googleHelper.getCredential() != null) {
+            return "redirect:/google/folder?path=root";
+        } else {
+            if (account.getGoogleUser() != null && googleHelper.authorize(account)) {
+                return "redirect:/google/folder?path=root";
+            }
+        }
+        return "redirect:/google/OAuth";
+        /*Account account = getAccount();
         if (account.getGoogleUser() == null)
             return "redirect:/google/OAuth";
-        return "redirect:/google/folder?path=root";
+        return "redirect:/google/folder?path=root";*/
     }
 
     @RequestMapping("/google/OAuth")

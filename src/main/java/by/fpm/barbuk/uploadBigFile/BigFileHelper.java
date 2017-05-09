@@ -1,13 +1,16 @@
 package by.fpm.barbuk.uploadBigFile;
 
-import by.fpm.barbuk.MoveController;
 import by.fpm.barbuk.account.Account;
 import by.fpm.barbuk.dropbox.DropboxHelper;
 import by.fpm.barbuk.google.drive.GoogleHelper;
-import by.fpm.barbuk.temboo.CloudHelper;
+import by.fpm.barbuk.yandex.YandexHelper;
 import com.temboo.core.TembooException;
 import org.json.JSONException;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Scope;
+import org.springframework.context.annotation.ScopedProxyMode;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -17,13 +20,20 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Vector;
 
-public final class BigFileHelper {
+@Component
+@Scope(value = "session", proxyMode = ScopedProxyMode.TARGET_CLASS)
+public class BigFileHelper {
 
 
     public static final String DROPBOX = "dropbox";
     public static final String GOOGLE = "google";
-    private CloudHelper dropboxHelper = new DropboxHelper();
-    private CloudHelper googleHelper = new GoogleHelper();
+    public static final String YANDEX = "yandex";
+    @Autowired
+    private DropboxHelper dropboxHelper;
+    @Autowired
+    private GoogleHelper googleHelper;
+    @Autowired
+    private YandexHelper yandexHelper;
 
     public void uploadFile(MultipartFile file, Account account) throws IOException, TembooException, JSONException {
         System.out.println(Runtime.getRuntime().maxMemory());
@@ -47,9 +57,9 @@ public final class BigFileHelper {
             /*System.arraycopy(file.getBytes(), (int) (uploadedSize), content, 0, (int) (filepartSize));*/
                 MultipartFile multipartFile = new MockMultipartFile(getFileName(bigFile, i), getFileName(bigFile, i), file.getContentType(), content);
                 System.out.println(cloud + "   " + filepartSize);
-                CloudHelper helper = getHelper(cloud);
-                long size = helper.getAvailableSize(account);
-                filePart.setPath(helper.uploadFile(multipartFile, "root", account));
+                DownloadUploadFile helper = getHelper(cloud);
+                /*long size = helper.getAvailableSize(account);*/
+                filePart.setPath(helper.uploadFile(multipartFile, getPath(cloud), account));
                 bigFile.getParts().add(filePart);
                 uploadedSize += filepartSize;
             }
@@ -64,24 +74,15 @@ public final class BigFileHelper {
     }
 
     public MultipartFile downloadFile(String id, Account account) throws IOException, TembooException, JSONException {
-        BigFile bigFile = null;
-        for (BigFile bf : account.getUserBigFiles().getBigFiles()) {
-            if (bf.getId().equals(id)) {
-                bigFile = bf;
-                break;
-            }
-        }
+        BigFile bigFile = getBigFile(account, id);
 
         Vector<InputStream> streams = new Vector<>(bigFile.getParts().size());
         if (bigFile != null) {
             long downloadedSize = 0;
-            /*byte[] fileBytes = new byte[(int) bigFile.getSize()];*/
             for (FilePart filePart : bigFile.getParts()) {
-                CloudHelper helper = getHelper(filePart.getCloudName());
-                String link = helper.getDownloadFileLink(filePart.getPath(), account, false);
-                MultipartFile multipartFile = MoveController.downloadFile(link, getAccessToken(filePart.getCloudName(), account));
+                DownloadUploadFile helper = getHelper(filePart.getCloudName());
+                MultipartFile multipartFile = helper.downloadFile(filePart.getPath(), account);
                 streams.add(multipartFile.getInputStream());
-                /*System.arraycopy(multipartFile.getBytes(), 0, fileBytes, (int) downloadedSize, (int) (multipartFile.getSize()));*/
                 downloadedSize += multipartFile.getSize();
             }
             if (downloadedSize == bigFile.getSize()) {
@@ -111,6 +112,9 @@ public final class BigFileHelper {
         if (account.getGoogleUser() != null) {
             clouds.add(GOOGLE);
         }
+        if (account.getYandexUser() != null) {
+            clouds.add(YANDEX);
+        }
         return clouds;
     }
 
@@ -123,24 +127,13 @@ public final class BigFileHelper {
     }
 
     private long generatePartSize(long uploadedSize, long fileSize) {
-        if (fileSize < 1000)
+        if (fileSize < 10000)
             return fileSize - uploadedSize;
-        /*long size= (long) (Math.random() * Math.min(fileSize/ 4.,50_000_000));
-        if(fileSize-uploadedSize<size)
-            return fileSize-uploadedSize;
-        return size;*/
-        long size = Math.min(fileSize - uploadedSize, (long) (Math.random() * Math.min(fileSize / 4., 20_000_000)));
-        return Math.min(size, 13_000_000);
-        /*long size = 0;
-        if (uploadedSize >= fileSize * 3 / 4) {
-            size = fileSize - uploadedSize;
-        } else {
-            size = (long) (fileSize * Math.random() / 4.);
-        }
-        return size;*/
+        long size = Math.min(fileSize - uploadedSize, (long) (Math.random() * Math.min(fileSize / 4., 1_000_000_000L)));
+        return Math.min(size, 1_000_000_000);
     }
 
-    private CloudHelper getHelper(String cloud) {
+    private DownloadUploadFile getHelper(String cloud) {
         switch (cloud) {
             case DROPBOX: {
                 return dropboxHelper;
@@ -148,9 +141,67 @@ public final class BigFileHelper {
             case GOOGLE: {
                 return googleHelper;
             }
+            case YANDEX: {
+                return yandexHelper;
+            }
             default: {
                 return dropboxHelper;
             }
         }
+    }
+
+    private String getPath(String cloud) {
+        switch (cloud) {
+            case YANDEX: {
+                return "disk:/";
+            }
+            default: {
+                return "root";
+            }
+        }
+    }
+
+    public DropboxHelper getDropboxHelper() {
+        return dropboxHelper;
+    }
+
+    public void setDropboxHelper(DropboxHelper dropboxHelper) {
+        this.dropboxHelper = dropboxHelper;
+    }
+
+    public GoogleHelper getGoogleHelper() {
+        return googleHelper;
+    }
+
+    public void setGoogleHelper(GoogleHelper googleHelper) {
+        this.googleHelper = googleHelper;
+    }
+
+    public YandexHelper getYandexHelper() {
+        return yandexHelper;
+    }
+
+    public void setYandexHelper(YandexHelper yandexHelper) {
+        this.yandexHelper = yandexHelper;
+    }
+
+    public boolean delete(String path, Account account) {
+        BigFile bigFile = getBigFile(account, path);
+        if (bigFile != null) {
+            for (FilePart filePart : bigFile.getParts()) {
+                DownloadUploadFile helper = getHelper(filePart.getCloudName());
+                helper.delete(path,account);
+            }
+        }
+        return true;
+    }
+
+    private BigFile getBigFile(Account account, String id) {
+        for (BigFile bf : account.getUserBigFiles().getBigFiles()) {
+            if (bf.getId().equals(id)) {
+                return bf;
+            }
+        }
+        return null;
     }
 }

@@ -1,13 +1,10 @@
 package by.fpm.barbuk.yandex;
 
 import by.fpm.barbuk.account.Account;
-import by.fpm.barbuk.account.CloudUser;
 import by.fpm.barbuk.cloudEntities.CloudFile;
 import by.fpm.barbuk.cloudEntities.CloudFolder;
-import by.fpm.barbuk.cloudEntities.FolderList;
-import by.fpm.barbuk.temboo.CloudHelper;
 import by.fpm.barbuk.temboo.TembooHelper;
-import com.squareup.okhttp.OkHttpClient;
+import by.fpm.barbuk.uploadBigFile.DownloadUploadFile;
 import com.temboo.core.TembooException;
 import com.yandex.disk.rest.Credentials;
 import com.yandex.disk.rest.ProgressListener;
@@ -18,16 +15,17 @@ import com.yandex.disk.rest.exceptions.ServerIOException;
 import com.yandex.disk.rest.exceptions.WrongMethodException;
 import com.yandex.disk.rest.json.Link;
 import com.yandex.disk.rest.json.Resource;
-import com.yandex.disk.rest.retrofit.CloudApi;
 import javafx.util.Pair;
 import org.apache.commons.io.FileUtils;
 import org.apache.http.NameValuePair;
 import org.apache.http.message.BasicNameValuePair;
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.springframework.context.annotation.Scope;
+import org.springframework.context.annotation.ScopedProxyMode;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
-import retrofit.RestAdapter;
 
 import java.io.*;
 import java.net.HttpURLConnection;
@@ -38,36 +36,28 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 
+@Component
+@Scope(value = "session", proxyMode = ScopedProxyMode.TARGET_CLASS)
+public class YandexHelper extends TembooHelper implements DownloadUploadFile {
 
-public final class YandexHelper extends TembooHelper implements CloudHelper {
-
+    public static final String OAUTH_URL = "https://oauth.yandex.ru/authorize?response_type=code&client_id=";
+    public static final String TOKEN_URL = "https://oauth.yandex.ru/token";
     private static String CLIENT_ID = "1a9e7ca4f42f46e6b1ebbf03a7125e20";
     private static String CLIENT_SECRET = "ff71d2231c504ac6b3ec40eb2237d3b2";
     private RestClient restClient;
     private Credentials credentials;
-    private OkHttpClient client;
-    private String serverURL;
-    private CloudApi cloudApi;
-    private RestAdapter.Builder builder;
 
-    @Override
+    public YandexHelper() {
+        System.out.println("new yandex helper");
+    }
+
     public String getLoginUrl() {
-        return "https://oauth.yandex.ru/authorize?response_type=code&client_id=" + CLIENT_ID;
-    }
-
-    @Override
-    public String getStateToken() {
-        return null;
-    }
-
-    @Override
-    public CloudUser getUserInfo() throws IOException {
-        return null;
+        return OAUTH_URL + CLIENT_ID;
     }
 
     public YandexUser getUserInfo(String code) throws IOException {
         YandexUser yandexUser = new YandexUser();
-        URL url = new URL("https://oauth.yandex.ru/token");
+        URL url = new URL(TOKEN_URL);
         HttpURLConnection httpConn = (HttpURLConnection) url.openConnection();
         try {
             httpConn.setRequestMethod("POST");
@@ -113,20 +103,22 @@ public final class YandexHelper extends TembooHelper implements CloudHelper {
         }
         this.credentials = new Credentials(CLIENT_ID, yandexUser.getAccessToken());
         restClient = new RestClient(credentials);
-
-        /*this.builder = new RestAdapter.Builder().set
-                .setClient(restClient)
-                .setRequestInterceptor(new RequestInterceptorImpl(credentials.getHeaders()))
-                .setErrorHandler(new ErrorHandlerImpl());
-
-        this.cloudApi = builder
-                .build()
-                .create(CloudApi.class);*/
         return yandexUser;
     }
 
-    @Override
-    public CloudFolder getFolderContent(String path, Account account) throws TembooException, JSONException, UnsupportedEncodingException {
+    public boolean authorize(Account account) {
+        try {
+            YandexUser user = account.getYandexUser();
+            setCredentials(new Credentials(CLIENT_ID, user.getAccessToken()));
+            restClient = new RestClient(credentials);
+            return true;
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    public CloudFolder getFolderContent(String path, Account account) {
         YandexUser yandexUser = account.getYandexUser();
         try {
             Resource resource = restClient.getResources(new ResourcesArgs.Builder().setPath(path).build());
@@ -159,9 +151,8 @@ public final class YandexHelper extends TembooHelper implements CloudHelper {
                 CloudFile cloudFile = new CloudFile();
                 cloudFile.setPath(res.getPath().getPrefix() + ":" + res.getPath().getPath());
                 cloudFile.setShowName(res.getName());
-                cloudFile.setSize(String.valueOf(res.getSize()));
                 cloudFile.setDir("dir".equals(res.getType()));
-                cloudFile.setBytes((int) res.getSize());
+                cloudFile.setBytes(res.getSize());
                 cloudFile.setRoot(res.getPath().getPrefix());
                 items.add(cloudFile);
                 if (cloudFile.isDir())
@@ -183,23 +174,14 @@ public final class YandexHelper extends TembooHelper implements CloudHelper {
         return null;
     }
 
-    @Override
-    public FolderList getFolders(String path, Account account) throws TembooException, JSONException, UnsupportedEncodingException {
-        return null;
+
+    public String getDownloadFileLink(String path, Account account) {
+        Resource resource = getFileMetadata(path, account);
+        return resource.getPublicUrl();
     }
 
     @Override
-    public String getDownloadFileLink(String path, Account account, boolean isFileContent) throws TembooException, JSONException {
-        try {
-            Resource resource = getFileMetadata(path, account);
-            return resource.getPublicUrl();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return null;
-    }
-
-    public MultipartFile downloadFile(String path, Account account) throws TembooException, JSONException {
+    public MultipartFile downloadFile(String path, Account account) {
         File file = null;
         try {
             Resource resource = getFileMetadata(path, account);
@@ -228,7 +210,7 @@ public final class YandexHelper extends TembooHelper implements CloudHelper {
 
 
     @Override
-    public boolean delete(String path, Account account) throws TembooException, JSONException {
+    public boolean delete(String path, Account account) {
         try {
             restClient.delete(path, true);
         } catch (ServerIOException e) {
@@ -240,9 +222,9 @@ public final class YandexHelper extends TembooHelper implements CloudHelper {
     }
 
     @Override
-    public String uploadFile(MultipartFile file, String path, Account account) throws TembooException, IOException, JSONException {
+    public String uploadFile(MultipartFile file, String path, Account account) {
         try {
-            Link link = restClient.getUploadLink(path + (!"disk:/".equals(path) ? "/" : "") + file.getOriginalFilename(), true);
+            Link link = restClient.getUploadLink(path + (!"disk:/".equals(path) ? "/" : "") + file.getOriginalFilename(),true);
             restClient.uploadFile(link, true, multipartToFile(file), new ProgressListener() {
                 @Override
                 public void updateProgress(long l, long l1) {
@@ -254,17 +236,19 @@ public final class YandexHelper extends TembooHelper implements CloudHelper {
                     return false;
                 }
             });
+            return path + (!"disk:/".equals(path) ? "/" : "") + file.getOriginalFilename();
         } catch (ServerIOException e) {
             e.printStackTrace();
         } catch (WrongMethodException e) {
             e.printStackTrace();
         } catch (ServerException e) {
             e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
         }
         return null;
     }
 
-    @Override
     public long getAvailableSize(Account account) throws TembooException, JSONException {
         return 0;
     }
@@ -287,8 +271,8 @@ public final class YandexHelper extends TembooHelper implements CloudHelper {
         return result.toString();
     }
 
-    public boolean createFolder(String path) throws TembooException, IOException {
-        URL url = new URL("https://cloud-api.yandex.net/v1/disk/resources/?path=" + path);
+    public boolean createFolder(String path) {
+        /*URL url = new URL("https://cloud-api.yandex.net/v1/disk/resources/?path=" + path);
         HttpURLConnection httpConn = (HttpURLConnection) url.openConnection();
         try {
             httpConn.setRequestMethod("PUT");
@@ -302,22 +286,18 @@ public final class YandexHelper extends TembooHelper implements CloudHelper {
             }
         } finally {
             httpConn.disconnect();
-        }
-        /*String folderName = null;
+        }*/
         try {
-            folderName = URLEncoder.encode(path.replaceFirst("disk:", ""), "utf-8");
-            restClient.makeFolder(folderName);
-        } catch (UnsupportedEncodingException e) {
-            e.printStackTrace();
+            restClient.makeFolder(path);
         } catch (ServerIOException e) {
             e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
-        }*/
+        }
         return true;
     }
 
-    public Resource getFileMetadata(String path, Account account) throws TembooException, JSONException, UnsupportedEncodingException {
+    public Resource getFileMetadata(String path, Account account) {
         YandexUser yandexUser = account.getYandexUser();
         try {
             return restClient.getResources(new ResourcesArgs.Builder().setPath(path).build());
@@ -333,5 +313,13 @@ public final class YandexHelper extends TembooHelper implements CloudHelper {
         File convFile = new File(multipart.getOriginalFilename());
         multipart.transferTo(convFile);
         return convFile;
+    }
+
+    public Credentials getCredentials() {
+        return credentials;
+    }
+
+    public void setCredentials(Credentials credentials) {
+        this.credentials = credentials;
     }
 }

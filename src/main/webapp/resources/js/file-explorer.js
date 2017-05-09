@@ -35,7 +35,7 @@ $(function () {
                     url: cloudStorage + '/delete?path=' + p,
                     type: 'DELETE',
                     success: function (result) {
-                        $("#dialog-message-ok").dialog('open');
+                        /*$("#dialog-message-ok").dialog('open');*/
                         location.reload();
                     },
                     fail: function (result) {
@@ -76,7 +76,7 @@ $(function () {
                     type: 'POST',
                     data: data,
                     success: function (result) {
-                        $("#dialog-message-ok").dialog('open');
+                        /*$("#dialog-message-ok").dialog('open');*/
                         location.reload();
                     },
                     fail: function (result) {
@@ -90,7 +90,7 @@ $(function () {
         }
     });
 
-    $("#moveDialog").dialog({
+    /*$("#moveDialog").dialog({
         resizable: false,
         height: "auto",
         width: 400,
@@ -101,7 +101,7 @@ $(function () {
                 $(this).dialog("close");
             },
         }
-    });
+    });*/
 
     var filemanager = $('.filemanager'),
         breadcrumbs = $('.breadcrumbs'),
@@ -137,8 +137,8 @@ $(function () {
             }
         }
         },
-        {divider: true},
-        {text: 'Move', href: '#'}
+        /*{divider: true},
+        {text: 'Move', href: '#'}*/
     ]);
 
     context.attach('.context-menu-file', [
@@ -157,7 +157,7 @@ $(function () {
                 $("#dialog-message-confirm-delete").dialog('open');
             }
         }
-        },
+        }/*,
         {divider: true},
         {
             text: 'Move', action: function (e) {
@@ -187,8 +187,8 @@ $(function () {
                             folder.appendTo(x);
                         }
                         $("#moveDialog").dialog('open');
-                        /*$("#dialog-message-ok").dialog('open');
-                         location.reload();*/
+                        /!*$("#dialog-message-ok").dialog('open');
+                         location.reload();*!/
                     },
                     fail: function (result) {
                         $("#dialog-message-fail").dialog('open');
@@ -215,7 +215,7 @@ $(function () {
                 });
             }
         }
-        }
+        }*/
     ]);
 
     $("#createNewFolder").click(function (e) {

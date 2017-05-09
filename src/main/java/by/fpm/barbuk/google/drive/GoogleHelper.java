@@ -1,65 +1,55 @@
 package by.fpm.barbuk.google.drive;
 
 import by.fpm.barbuk.account.Account;
-import by.fpm.barbuk.account.CloudUser;
 import by.fpm.barbuk.cloudEntities.CloudFile;
 import by.fpm.barbuk.cloudEntities.CloudFolder;
-import by.fpm.barbuk.cloudEntities.FolderList;
-import by.fpm.barbuk.temboo.CloudHelper;
 import by.fpm.barbuk.temboo.TembooHelper;
+import by.fpm.barbuk.uploadBigFile.DownloadUploadFile;
 import com.google.api.client.auth.oauth2.*;
 import com.google.api.client.http.BasicAuthentication;
 import com.google.api.client.http.FileContent;
 import com.google.api.client.http.GenericUrl;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.jackson2.JacksonFactory;
-import com.google.api.client.util.store.FileDataStoreFactory;
 import com.google.api.services.drive.Drive;
+import com.google.api.services.drive.model.File;
 import com.google.api.services.drive.model.FileList;
-import com.temboo.core.TembooException;
 import javafx.util.Pair;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
+import org.springframework.context.annotation.Scope;
+import org.springframework.context.annotation.ScopedProxyMode;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.File;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import java.security.SecureRandom;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-
-public final class GoogleHelper extends TembooHelper implements CloudHelper {
+@Component
+@Scope(value = "session", proxyMode = ScopedProxyMode.TARGET_CLASS)
+public class GoogleHelper extends TembooHelper implements DownloadUploadFile {
 
     public static final String MIME_TYPE_FOLDER = "application/vnd.google-apps.folder";
     public static final String CLIENT_ID = "569486570902-vrcv37j4msm28ucb22024aseesf8s4is.apps.googleusercontent.com";
     public static final String CLIENT_SECRET = "giRKgPH6v0eCPMDIEhrcKVBh";
     private static final String FORWARDING_URL = "http://localhost:8080/google/OAuthLogIn";
     private static final String SCOPE = "https://www.googleapis.com/auth/drive";
+    public static final String TOKEN_URL = "https://www.googleapis.com/oauth2/v4/token";
     private static Map<String, String> folders = new HashMap<>();
     private Drive SERVICE;
+    private Credential credential;
+
+    public GoogleHelper() {
+        System.out.println("new google helper");
+    }
 
     public static Drive getDriveService(Credential credential) throws IOException {
         return new Drive.Builder(
                 new NetHttpTransport(), new JacksonFactory(), credential)
                 .setApplicationName("course")
-                .build();
-    }
-
-    protected AuthorizationCodeFlow initializeFlow() throws IOException {
-        return new AuthorizationCodeFlow.Builder(BearerToken.authorizationHeaderAccessMethod(),
-                new NetHttpTransport(),
-                new JacksonFactory(),
-                new GenericUrl("https://server.example.com/token"),
-                new BasicAuthentication("s6BhdRkqt3", "7Fjfp0ZBr1KtDRbnfVdmIw"),
-                "s6BhdRkqt3",
-                "https://server.example.com/authorize").setCredentialDataStore(
-                StoredCredential.getDefaultDataStore(
-                        new FileDataStoreFactory(new File("datastoredir"))))
                 .build();
     }
 
@@ -73,47 +63,52 @@ public final class GoogleHelper extends TembooHelper implements CloudHelper {
 
     }
 
-    private void generateStateToken() {
-        SecureRandom random = new SecureRandom();
-        stateToken = "google-" + random.nextInt();
-    }
-
-    public String getStateToken() {
-        return stateToken;
-    }
-
-    @Override
-    public CloudUser getUserInfo() throws IOException {
-        return null;
-    }
-
     public GoogleUser getUserInfo(String url) throws IOException {
         AuthorizationCodeResponseUrl authResp = new AuthorizationCodeResponseUrl(url);
         if (authResp.getError() == null) {
             String code = authResp.getCode();
             TokenResponse tokenResponse = new AuthorizationCodeTokenRequest(new NetHttpTransport(), new JacksonFactory(),
-                    new GenericUrl("https://www.googleapis.com/oauth2/v4/token"), code)
+                    new GenericUrl(TOKEN_URL), code)
                     .setRedirectUri(FORWARDING_URL)
                     .setClientAuthentication(new BasicAuthentication(CLIENT_ID, CLIENT_SECRET)).execute();
             GoogleUser googleUser = new GoogleUser();
             googleUser.setAccessToken(tokenResponse.getAccessToken());
             googleUser.setRefreshToken(tokenResponse.getRefreshToken());
-            Credential credential = (Credential) new Credential.Builder(BearerToken.authorizationHeaderAccessMethod())
+            setCredential(new Credential.Builder(BearerToken.authorizationHeaderAccessMethod())
                     .setTransport(new NetHttpTransport())
                     .setJsonFactory(new JacksonFactory())
                     .setTokenServerUrl(new GenericUrl("https://www.googleapis.com/oauth2/v4/token"))
                     .setClientAuthentication(new BasicAuthentication(CLIENT_ID, CLIENT_SECRET))
                     .build()
-                    .setFromTokenResponse(tokenResponse);
+                    .setFromTokenResponse(tokenResponse));
             SERVICE = getDriveService(credential);
             return googleUser;
         }
         return null;
     }
 
-    private List<Pair<String, String>> getParents(String path, GoogleUser user) throws TembooException, JSONException, IOException {
+    public boolean authorize(Account account) {
+        try {
+            GoogleUser user = account.getGoogleUser();
+            setCredential(new Credential.Builder(BearerToken.authorizationHeaderAccessMethod())
+                    .setTransport(new NetHttpTransport())
+                    .setJsonFactory(new JacksonFactory())
+                    .setTokenServerUrl(new GenericUrl("https://www.googleapis.com/oauth2/v4/token"))
+                    .setClientAuthentication(new BasicAuthentication(CLIENT_ID, CLIENT_SECRET))
+                    .build()
+                    .setAccessToken(user.getAccessToken()));
+            SERVICE = getDriveService(credential);
+            return true;
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
-        com.google.api.services.drive.model.File result = SERVICE.files().get(path).setFields("parents").execute();
+        return false;
+    }
+
+    private List<Pair<String, String>> getParents(String path, GoogleUser user) throws IOException {
+
+        File result = SERVICE.files().get(path).setFields("parents").execute();
         result.getParents();
         if (result.getParents() != null) {
             List<Pair<String, String>> pairs = new ArrayList<>();
@@ -129,7 +124,7 @@ public final class GoogleHelper extends TembooHelper implements CloudHelper {
         return new ArrayList<>();
     }
 
-    public CloudFolder getFolderContent(String path, Account account) throws TembooException, JSONException, UnsupportedEncodingException {
+    public CloudFolder getFolderContent(String path, Account account) {
         GoogleUser user = account.getGoogleUser();
         try {
             FileList result = SERVICE.files().list()
@@ -144,7 +139,7 @@ public final class GoogleHelper extends TembooHelper implements CloudHelper {
             List<CloudFile> items = new ArrayList<>();
             List<CloudFile> folders = new ArrayList<>();
             List<CloudFile> files = new ArrayList<>();
-            for (com.google.api.services.drive.model.File file : result.getFiles()) {
+            for (File file : result.getFiles()) {
                 CloudFile cloudFile = new CloudFile();
                 cloudFile.setPath(file.getId());
                 cloudFile.setShowName(file.getName());
@@ -168,7 +163,7 @@ public final class GoogleHelper extends TembooHelper implements CloudHelper {
         return new CloudFolder();
     }
 
-    public FolderList getFolders(String path, Account account) throws TembooException, JSONException, UnsupportedEncodingException {
+    /*public FolderList getFolders(String path, Account account) throws TembooException, JSONException, UnsupportedEncodingException {
         GoogleUser user = account.getGoogleUser();
         FolderList folderList = new FolderList();
         com.temboo.Library.Google.Drive.Files.List filesListChoreo = new com.temboo.Library.Google.Drive.Files.List(session);
@@ -220,17 +215,13 @@ public final class GoogleHelper extends TembooHelper implements CloudHelper {
             e.printStackTrace();
         }
         return folderList;
-    }
+    }*/
 
-    @Override
-    public String getDownloadFileLink(String path, Account account, boolean isFileContent) throws TembooException, JSONException {
-        return null;
-    }
 
-    public String getDownloadFileLink(String path, Account account) throws TembooException, JSONException {
+    public String getDownloadFileLink(String path, Account account) {
         GoogleUser user = account.getGoogleUser();
         try {
-            com.google.api.services.drive.model.File file = SERVICE.files().get(path).setFields("webContentLink").execute();
+            File file = SERVICE.files().get(path).setFields("webContentLink").execute();
             return file.getWebContentLink();
         } catch (IOException e) {
             e.printStackTrace();
@@ -238,7 +229,8 @@ public final class GoogleHelper extends TembooHelper implements CloudHelper {
         return "";
     }
 
-    public boolean delete(String path, Account account) throws TembooException, JSONException {
+    @Override
+    public boolean delete(String path, Account account) {
         GoogleUser user = account.getGoogleUser();
         try {
             SERVICE.files().delete(path).execute();
@@ -248,15 +240,15 @@ public final class GoogleHelper extends TembooHelper implements CloudHelper {
         return true;
     }
 
-    public boolean createFolder(String path, String folderName, Account account) throws TembooException, JSONException {
+    public boolean createFolder(String path, String folderName, Account account) {
         try {
-            com.google.api.services.drive.model.File fileMetadata = new com.google.api.services.drive.model.File();
+            File fileMetadata = new File();
             fileMetadata.setName(folderName);
             fileMetadata.setMimeType("application/vnd.google-apps.folder");
             List<String> parents = new ArrayList<>();
             parents.add(path);
             fileMetadata.setParents(parents);
-            com.google.api.services.drive.model.File file = SERVICE.files().create(fileMetadata)
+            File file = SERVICE.files().create(fileMetadata)
                     .execute();
         } catch (IOException e) {
             e.printStackTrace();
@@ -265,31 +257,68 @@ public final class GoogleHelper extends TembooHelper implements CloudHelper {
 
     }
 
-    public String uploadFile(MultipartFile file, String path, Account account) throws TembooException, IOException, JSONException {
+    @Override
+    public MultipartFile downloadFile(String path, Account account) {
+        InputStream in = null;
+        try {
+            in = SERVICE.files().get(path).executeMediaAsInputStream();
+            File file = SERVICE.files().get(path).execute();
+            MultipartFile multipartFile =
+                    new MockMultipartFile(file.getName(), file.getName(), file.getMimeType(), in);
+            return multipartFile;
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            if (in != null) {
+                try {
+                    in.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+        return null;
+    }
+
+    @Override
+    public String uploadFile(MultipartFile file, String path, Account account) {
         GoogleUser user = account.getGoogleUser();
-        com.google.api.services.drive.model.File fileMetadata = new com.google.api.services.drive.model.File();
+        File fileMetadata = new File();
         fileMetadata.setName(file.getOriginalFilename());
         List<String> parents = new ArrayList<>();
         parents.add(path);
         fileMetadata.setParents(parents);
 
-        FileContent mediaContent = new FileContent(file.getContentType(), multipartToFile(file));
-        com.google.api.services.drive.model.File result = SERVICE.files().create(fileMetadata, mediaContent)
-                .set("uploadType", "resumable")
-                .execute();
+        FileContent mediaContent = null;
+        try {
+            mediaContent = new FileContent(file.getContentType(), multipartToFile(file));
+            File result = SERVICE.files()
+                    .create(fileMetadata, mediaContent)
+                    .set("uploadType", "resumable")
+                    .execute();
+            return result.getId();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         return "";
     }
 
-    @Override
     public long getAvailableSize(Account account) {
 
         return 0;
     }
 
-    public File multipartToFile(MultipartFile multipart) throws IllegalStateException, IOException {
-        File convFile = new File(multipart.getOriginalFilename());
+    public java.io.File multipartToFile(MultipartFile multipart) throws IllegalStateException, IOException {
+        java.io.File convFile = new java.io.File(multipart.getOriginalFilename());
         multipart.transferTo(convFile);
         return convFile;
     }
 
+    public Credential getCredential() {
+        return credential;
+    }
+
+    public void setCredential(Credential credential) {
+        this.credential = credential;
+    }
 }

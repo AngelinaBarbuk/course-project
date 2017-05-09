@@ -1,6 +1,7 @@
 package by.fpm.barbuk.config;
 
 import by.fpm.barbuk.account.AccountService;
+import by.fpm.barbuk.account.AuthenticationSuccessHandlerImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -12,6 +13,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.security.web.authentication.rememberme.TokenBasedRememberMeServices;
 
 @Configuration
@@ -52,6 +54,7 @@ class SecurityConfig extends WebSecurityConfigurerAdapter {
                 .formLogin()
                 .loginPage("/signin")
                 .permitAll()
+                .successHandler(authenticationSuccessHandlerBean())
                 .failureUrl("/signin?error=1")
                 .loginProcessingUrl("/authenticate")
                 .and()
@@ -69,5 +72,10 @@ class SecurityConfig extends WebSecurityConfigurerAdapter {
     @Override
     public AuthenticationManager authenticationManagerBean() throws Exception {
         return super.authenticationManagerBean();
+    }
+
+    @Bean(name = "authSuccessHandler")
+    public AuthenticationSuccessHandler authenticationSuccessHandlerBean() throws Exception {
+        return new AuthenticationSuccessHandlerImpl();
     }
 }

@@ -3,7 +3,6 @@ package by.fpm.barbuk.yandex;
 import by.fpm.barbuk.account.Account;
 import by.fpm.barbuk.account.AccountService;
 import by.fpm.barbuk.cloudEntities.CloudFolder;
-import by.fpm.barbuk.cloudEntities.FolderList;
 import by.fpm.barbuk.support.web.AjaxRequestBody;
 import by.fpm.barbuk.support.web.AjaxResponseBody;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -34,8 +33,8 @@ import java.net.URLEncoder;
 public class YandexController {
     @Autowired
     private AccountService accountService;
-
-    private YandexHelper yandexHelper = new YandexHelper();
+    @Autowired
+    private YandexHelper yandexHelper;
     private ObjectMapper mapper = new ObjectMapper();
 
     @ModelAttribute("module")
@@ -86,13 +85,13 @@ public class YandexController {
         return "redirect:" + result;
     }*/
 
-    @RequestMapping(value = "/yandex/getFolders", method = RequestMethod.GET)
+    /*@RequestMapping(value = "/yandex/getFolders", method = RequestMethod.GET)
     @Secured({"ROLE_USER", "ROLE_ADMIN"})
     @ResponseBody
     public FolderList yandexGetFolders(@RequestParam(name = "path") String path) throws JSONException, TembooException, IOException {
         FolderList result = yandexHelper.getFolders(path, getAccount());
         return result;
-    }
+    }*/
 
     @RequestMapping(value = "/yandex/delete", method = RequestMethod.DELETE)
     @Secured({"ROLE_USER", "ROLE_ADMIN"})
@@ -130,9 +129,18 @@ public class YandexController {
     @Secured({"ROLE_USER", "ROLE_ADMIN"})
     String yandex() {
         Account account = getAccount();
+        if (yandexHelper.getCredentials() != null) {
+            return "redirect:/yandex/folder?path=disk:/";
+        } else {
+            if (account.getYandexUser() != null && yandexHelper.authorize(account)) {
+                return "redirect:/yandex/folder?path=disk:/";
+            }
+        }
+        return "redirect:/yandex/OAuth";
+        /*Account account = getAccount();
         if (account.getYandexUser() == null)
             return "redirect:/yandex/OAuth";
-        return "redirect:/yandex/folder?path=disk:/";
+        return "redirect:/yandex/folder?path=disk:/";*/
     }
 
     @RequestMapping("/yandex/OAuth")

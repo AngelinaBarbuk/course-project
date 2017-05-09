@@ -13,9 +13,6 @@ public class DropboxUser extends CloudUser {
     private String accessSecret;
     private Map<String, SecretKey> encryptionKeys;
 
-    public String getUserId() {
-        return userId;
-    }
 
     public void setUserId(String userId) {
         this.userId = userId;

@@ -4,7 +4,6 @@ import by.fpm.barbuk.account.Account;
 import by.fpm.barbuk.account.AccountService;
 import by.fpm.barbuk.dropbox.DropboxHelper;
 import by.fpm.barbuk.google.drive.GoogleHelper;
-import by.fpm.barbuk.temboo.CloudHelper;
 import com.temboo.core.TembooException;
 import org.json.JSONException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,7 +29,7 @@ public class MoveController {
     private AccountService accountService;
 
     private GoogleHelper googleHelper = new GoogleHelper();
-    private CloudHelper dropboxHelper = new DropboxHelper();
+    private DropboxHelper dropboxHelper = new DropboxHelper();
 
     public static MultipartFile downloadFile(String urlStr, String accessToken) throws TembooException, JSONException, IOException {
         CookieHandler.setDefault(new CookieManager(null, CookiePolicy.ACCEPT_ALL));
@@ -80,7 +79,7 @@ public class MoveController {
     @ResponseBody
     public String dropboxToGoogle(@RequestParam(name = "fileToMove") String path, @RequestParam(name = "pathToMove") String folderName) throws JSONException, TembooException, IOException {
         Account account = getAccount();
-        String url = dropboxHelper.getDownloadFileLink(path, account, false);
+        String url = dropboxHelper.getDownloadFileLink(path, account);
         MultipartFile file = downloadFile(url, null);
         googleHelper.uploadFile(file, folderName, account);
         return "success";
@@ -91,7 +90,7 @@ public class MoveController {
     @ResponseBody
     public String googleToDropbox(@RequestParam(name = "fileToMove") String path, @RequestParam(name = "pathToMove") String folderName) throws JSONException, TembooException, IOException {
         Account account = getAccount();
-        String url = googleHelper.getDownloadFileLink(path, account, false);
+        String url = googleHelper.getDownloadFileLink(path, account);
         MultipartFile file = downloadFile(url, null);
         dropboxHelper.uploadFile(file, folderName, account);
         return "success";
