@@ -31,7 +31,7 @@ $(function () {
                 var x = document.getElementsByClassName("selected");
                 var p = x[0].getElementsByTagName("input")[0].value;
                 $.ajax({
-                    url: cloudStorage + '/delete?path=' + p,
+                    url: '/bigFile/delete?path=' + p,
                     type: 'DELETE',
                     success: function (result) {
                         $("#dialog-message-ok").dialog('open');

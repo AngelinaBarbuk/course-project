@@ -8,6 +8,8 @@ import org.springframework.web.multipart.MultipartFile;
  */
 public interface DownloadUploadFile {
 
+    int CHUNKED_UPLOAD_MAX_ATTEMPTS = 3;
+
     MultipartFile downloadFile(String path, Account account);
 
     String uploadFile(MultipartFile file, String path, Account account);

@@ -3,7 +3,6 @@ package by.fpm.barbuk.google.drive;
 import by.fpm.barbuk.account.Account;
 import by.fpm.barbuk.cloudEntities.CloudFile;
 import by.fpm.barbuk.cloudEntities.CloudFolder;
-import by.fpm.barbuk.temboo.TembooHelper;
 import by.fpm.barbuk.uploadBigFile.DownloadUploadFile;
 import com.google.api.client.auth.oauth2.*;
 import com.google.api.client.http.BasicAuthentication;
@@ -30,7 +29,7 @@ import java.util.Map;
 
 @Component
 @Scope(value = "session", proxyMode = ScopedProxyMode.TARGET_CLASS)
-public class GoogleHelper extends TembooHelper implements DownloadUploadFile {
+public class GoogleHelper implements DownloadUploadFile {
 
     public static final String MIME_TYPE_FOLDER = "application/vnd.google-apps.folder";
     public static final String CLIENT_ID = "569486570902-vrcv37j4msm28ucb22024aseesf8s4is.apps.googleusercontent.com";
@@ -163,60 +162,6 @@ public class GoogleHelper extends TembooHelper implements DownloadUploadFile {
         return new CloudFolder();
     }
 
-    /*public FolderList getFolders(String path, Account account) throws TembooException, JSONException, UnsupportedEncodingException {
-        GoogleUser user = account.getGoogleUser();
-        FolderList folderList = new FolderList();
-        com.temboo.Library.Google.Drive.Files.List filesListChoreo = new com.temboo.Library.Google.Drive.Files.List(session);
-        com.temboo.Library.Google.Drive.Files.List.ListInputSet filesListInputs = filesListChoreo.newInputSet();
-
-        filesListInputs.set_ClientID(CLIENT_ID);
-        filesListInputs.set_ClientSecret(CLIENT_SECRET);
-        filesListInputs.set_AccessToken(user.getAccessToken());
-        filesListInputs.setInput("corpus", "domain");
-        filesListInputs.set_MaxResults(1000);
-        filesListInputs.set_Query("'" + path + "' in parents and mimeType = '" + MIME_TYPE_FOLDER + "'");
-        try {
-            com.temboo.Library.Google.Drive.Files.List.ListResultSet filesListResults;
-            try {
-                filesListResults = filesListChoreo.execute(filesListInputs);
-            } catch (TembooException e) {
-                filesListInputs.set_RefreshToken(user.getRefreshToken());
-                filesListResults = filesListChoreo.execute(filesListInputs);
-            }
-            if (filesListResults.getException() == null) {
-                String newAccessToken = filesListResults.get_NewAccessToken();
-                if (newAccessToken != null && !newAccessToken.isEmpty()) {
-                    user.setAccessToken(newAccessToken);
-                    account.setGoogleUser(user);
-                }
-                JSONObject result = new JSONObject(filesListResults.get_Response());
-                JSONArray content = result.getJSONArray("items");
-                List<CloudFile> folders = new ArrayList<>();
-                for (int i = 0; i < content.length(); i++) {
-                    CloudFile cloudFile = new CloudFile();
-                    JSONObject object = content.getJSONObject(i);
-                    cloudFile.setPath(object.getString("id"));
-                    cloudFile.setShowName(object.getString("title"));
-                    cloudFile.setDir(object.getString("mimeType").equals(MIME_TYPE_FOLDER) ? true : false);
-                    folders.add(cloudFile);
-                    this.folders.put(cloudFile.getPath(), cloudFile.getShowName());
-                }
-                folderList.setFolders(folders);
-                List<Pair<String, String>> pairs = getParents(path, user);
-                if (pairs.isEmpty())
-                    folderList.setPrevFolder("");
-                else
-                    folderList.setPrevFolder(pairs.get(pairs.size() - 1).getKey());
-                return folderList;
-            }
-        } catch (TembooException ex) {
-            System.out.println("empty");
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return folderList;
-    }*/
-
 
     public String getDownloadFileLink(String path, Account account) {
         GoogleUser user = account.getGoogleUser();
@@ -260,20 +205,22 @@ public class GoogleHelper extends TembooHelper implements DownloadUploadFile {
     @Override
     public MultipartFile downloadFile(String path, Account account) {
         InputStream in = null;
-        try {
-            in = SERVICE.files().get(path).executeMediaAsInputStream();
-            File file = SERVICE.files().get(path).execute();
-            MultipartFile multipartFile =
-                    new MockMultipartFile(file.getName(), file.getName(), file.getMimeType(), in);
-            return multipartFile;
-        } catch (IOException e) {
-            e.printStackTrace();
-        } finally {
-            if (in != null) {
-                try {
-                    in.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
+        for(int i = 0; i<CHUNKED_UPLOAD_MAX_ATTEMPTS; i++) {
+            try {
+                in = SERVICE.files().get(path).executeMediaAsInputStream();
+                File file = SERVICE.files().get(path).execute();
+                MultipartFile multipartFile =
+                        new MockMultipartFile(file.getName(), file.getName(), file.getMimeType(), in);
+                return multipartFile;
+            }catch (IOException e) {
+                continue;
+            } finally {
+                if (in != null) {
+                    try {
+                        in.close();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
                 }
             }
         }
@@ -289,16 +236,17 @@ public class GoogleHelper extends TembooHelper implements DownloadUploadFile {
         parents.add(path);
         fileMetadata.setParents(parents);
 
-        FileContent mediaContent = null;
-        try {
-            mediaContent = new FileContent(file.getContentType(), multipartToFile(file));
-            File result = SERVICE.files()
-                    .create(fileMetadata, mediaContent)
-                    .set("uploadType", "resumable")
-                    .execute();
-            return result.getId();
-        } catch (IOException e) {
-            e.printStackTrace();
+        for(int i=0; i<CHUNKED_UPLOAD_MAX_ATTEMPTS; i++) {
+            try {
+                FileContent mediaContent = new FileContent(file.getContentType(), multipartToFile(file));
+                File result = SERVICE.files()
+                        .create(fileMetadata, mediaContent)
+                        .set("uploadType", "resumable")
+                        .execute();
+                return result.getId();
+            } catch (IOException e) {
+                continue;
+            }
         }
         return "";
     }

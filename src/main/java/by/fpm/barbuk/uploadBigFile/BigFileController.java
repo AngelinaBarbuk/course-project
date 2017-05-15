@@ -18,9 +18,6 @@ import org.springframework.web.servlet.ModelAndView;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 
-/**
- * Created by B on 02.12.2016.
- */
 @Controller
 public class BigFileController {
     @Autowired
@@ -60,7 +57,9 @@ public class BigFileController {
     @Secured({"ROLE_USER", "ROLE_ADMIN"})
     @ResponseBody
     public String delete(@RequestParam(name = "path") String path) throws JSONException, TembooException, IOException {
-        boolean result = bigFileHelper.delete(path, getAccount());
+        Account account = getAccount();
+        boolean result = bigFileHelper.delete(path, account);
+        accountService.updateUsers(account);
         return "success";
     }
 
@@ -72,7 +71,10 @@ public class BigFileController {
 
     @RequestMapping("/bigFile")
     @Secured({"ROLE_USER", "ROLE_ADMIN"})
-    ModelAndView bigFile() {
+    ModelAndView bigFile() throws Exception {
+        if(bigFileHelper.collectClouds(getAccount()).isEmpty()){
+            throw new Exception("No available clouds");
+        }
         ModelAndView modelAndView = new ModelAndView();
         modelAndView.setViewName("bigFile/bigFile");
         Account account = getAccount();

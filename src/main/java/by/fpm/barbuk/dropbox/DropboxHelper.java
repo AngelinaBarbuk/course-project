@@ -3,7 +3,6 @@ package by.fpm.barbuk.dropbox;
 import by.fpm.barbuk.account.Account;
 import by.fpm.barbuk.cloudEntities.CloudFile;
 import by.fpm.barbuk.cloudEntities.CloudFolder;
-import by.fpm.barbuk.temboo.TembooHelper;
 import by.fpm.barbuk.uploadBigFile.DownloadUploadFile;
 import com.dropbox.core.*;
 import com.dropbox.core.v2.DbxClientV2;
@@ -26,7 +25,7 @@ import java.util.List;
 
 @Component
 @Scope(value = "session", proxyMode = ScopedProxyMode.TARGET_CLASS)
-public class DropboxHelper extends TembooHelper implements DownloadUploadFile {
+public class DropboxHelper implements DownloadUploadFile {
 
     // Provide your dropbox App ID and App Secret.
     private static final String APP_ID = "mvfavfx9yg4ts62";
@@ -41,7 +40,6 @@ public class DropboxHelper extends TembooHelper implements DownloadUploadFile {
     private DbxClientV2 client;
 
     private static final long CHUNKED_UPLOAD_CHUNK_SIZE = 8L << 20; // 8MiB
-    private static final int CHUNKED_UPLOAD_MAX_ATTEMPTS = 5;
 
     public DropboxHelper() {
 
@@ -170,54 +168,6 @@ public class DropboxHelper extends TembooHelper implements DownloadUploadFile {
         return "root".equals(path) ? "" : path;
     }
 
-
-    /*public FolderList getFolders(String path, Account account) {
-        DropboxUser user = account.getDropboxUser();
-        FolderList folderList = new FolderList();
-        ListFolderContents listFolderContentsChoreo = new ListFolderContents(session);
-        ListFolderContents.ListFolderContentsInputSet listFolderContentsInputs = listFolderContentsChoreo.newInputSet();
-
-        listFolderContentsInputs.set_AppKey(APP_ID);
-        listFolderContentsInputs.set_AppSecret(APP_SECRET);
-        listFolderContentsInputs.set_AccessToken(user.getAccessToken());
-        listFolderContentsInputs.set_AccessTokenSecret(user.getAccessSecret());
-        listFolderContentsInputs.set_Folder("root".equals(path) ? "" : path);
-
-        ListFolderContents.ListFolderContentsResultSet listFolderContentsResults = listFolderContentsChoreo.execute(listFolderContentsInputs);
-        if (listFolderContentsResults.getException() == null) {
-            JSONObject result = new JSONObject(listFolderContentsResults.get_Response());
-            JSONArray content = result.getJSONArray("contents");
-            List<CloudFile> folders = new ArrayList<>();
-            for (int i = 0; i < content.length(); i++) {
-                CloudFile cloudFile = new CloudFile();
-                JSONObject object = content.getJSONObject(i);
-                cloudFile.setDir(object.getBoolean("is_dir"));
-                if (cloudFile.isDir()) {
-                    cloudFile.setRev(object.getString("rev"));
-                    cloudFile.setPath(object.getString("path"));
-                    cloudFile.setShowName(cloudFile.getPath().substring(cloudFile.getPath().lastIndexOf("/") + 1));
-                    cloudFile.setSize(object.getString("size"));
-                    cloudFile.setReadOnly(object.getBoolean("read_only"));
-                    cloudFile.setBytes(object.getInt("bytes"));
-                    cloudFile.setRoot(object.getString("root"));
-                    folders.add(cloudFile);
-                }
-            }
-            folderList.setFolders(folders);
-            if ("root".equals(path)) {
-                folderList.setPrevFolder("");
-            } else {
-                String prev = path.substring(0, path.lastIndexOf("/"));
-                if ("".equals(prev))
-                    folderList.setPrevFolder("root");
-                else
-                    folderList.setPrevFolder(prev);
-            }
-            return folderList;
-        }
-        return folderList;
-    }*/
-
     public String getDownloadFileLink(String path, Account account) {
         DropboxUser user = account.getDropboxUser();
         try {
@@ -254,21 +204,32 @@ public class DropboxHelper extends TembooHelper implements DownloadUploadFile {
         DropboxUser user = account.getDropboxUser();
         long size = file.getSize();
         if (size < CHUNKED_UPLOAD_CHUNK_SIZE) {
-            try {
-                FileMetadata fileMetadata = client.files()
-                        .uploadBuilder((getPath(path)) + "/" + file.getOriginalFilename())
-                        .withMode(WriteMode.ADD)
-                        .uploadAndFinish(file.getInputStream());
-                return fileMetadata.getName();
-            } catch (DbxException e) {
-                e.printStackTrace();
-            } catch (IOException e) {
-                e.printStackTrace();
+            for (int i = 0; i < CHUNKED_UPLOAD_MAX_ATTEMPTS; ++i) {
+                try {
+                    FileMetadata fileMetadata = client.files()
+                            .uploadBuilder((getPath(path)) + "/" + file.getOriginalFilename())
+                            .withMode(WriteMode.ADD)
+                            .withAutorename(true)
+                            .uploadAndFinish(file.getInputStream());
+                    return fileMetadata.getPathLower();
+                } catch (NetworkIOException ex) {
+                    // network issue with Dropbox (maybe a timeout?) try again
+                    continue;
+                } catch (DbxException e) {
+                    e.printStackTrace();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
             }
         }
         long uploaded = 0L;
 
         String sessionId = null;
+        CommitInfo commitInfo = CommitInfo.newBuilder((getPath(path)) + "/" + file.getOriginalFilename())
+                .withMode(WriteMode.ADD)
+                .withAutorename(true)
+                .build();
+        UploadSessionCursor cursor = null;
         for (int i = 0; i < CHUNKED_UPLOAD_MAX_ATTEMPTS; ++i) {
 
             try (InputStream in = file.getInputStream()) {
@@ -280,7 +241,7 @@ public class DropboxHelper extends TembooHelper implements DownloadUploadFile {
                             .getSessionId();
                     uploaded += CHUNKED_UPLOAD_CHUNK_SIZE;
                 }
-                UploadSessionCursor cursor = new UploadSessionCursor(sessionId, uploaded);
+                cursor = new UploadSessionCursor(sessionId, uploaded);
                 // (2) Append
                 while ((size - uploaded) > CHUNKED_UPLOAD_CHUNK_SIZE) {
                     client.files().uploadSessionAppendV2(cursor)
@@ -290,13 +251,11 @@ public class DropboxHelper extends TembooHelper implements DownloadUploadFile {
                 }
                 // (3) Finish
                 long remaining = size - uploaded;
-                CommitInfo commitInfo = CommitInfo.newBuilder((getPath(path)) + "/" + file.getOriginalFilename())
-                        .withMode(WriteMode.ADD)
-                        .build();
+
                 FileMetadata metadata = client.files().uploadSessionFinish(cursor, commitInfo)
                         .uploadAndFinish(in, remaining);
                 System.out.println(metadata.toStringMultiline());
-                return metadata.getName();
+                return metadata.getPathLower();
             } catch (RetryException ex) {
                 continue;
             } catch (NetworkIOException ex) {
@@ -318,116 +277,42 @@ public class DropboxHelper extends TembooHelper implements DownloadUploadFile {
                     continue;
                 }
             } catch (DbxException ex) {
+                ex.printStackTrace();
 
             } catch (IOException ex) {
+                ex.printStackTrace();
             }
         }
         return "";
     }
 
-    /*public Account encrypt(String path, Account account) throws TembooException, IOException, NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException, JSONException {
-        DropboxUser dropboxUser = account.getDropboxUser();
-        try {
-
-
-            String urlStr = getDownloadFileLink(path, account);
-            URL url = new URL(urlStr);
-            HttpURLConnection httpConn = (HttpURLConnection) url.openConnection();
-            int responseCode = httpConn.getResponseCode();
-
-            // always check HTTP response code first
-            if (responseCode == HttpURLConnection.HTTP_OK) {
-                String fileName = "";
-                String disposition = httpConn.getHeaderField("Content-Disposition");
-                String contentType = httpConn.getContentType();
-                int contentLength = httpConn.getContentLength();
-
-                if (disposition != null) {
-                    int index = disposition.indexOf("filename=");
-                    if (index > 0) {
-                        fileName = disposition.substring(index + 10,
-                                disposition.length() - 1);
-                        fileName = fileName.substring(0, fileName.indexOf("\""));
-                    }
-                } else {
-                    fileName = urlStr.substring(urlStr.lastIndexOf("/") + 1,
-                            urlStr.length());
-                }
-
-                System.out.println("Content-Type = " + contentType);
-                System.out.println("Content-Disposition = " + disposition);
-                System.out.println("Content-Length = " + contentLength);
-                System.out.println("fileName = " + fileName);
-
-                // opens input stream from the HTTP connection
-                InputStream inputStream = httpConn.getInputStream();
-                MultipartFile multipartFile = new MockMultipartFile(fileName, fileName, contentType, inputStream);
-                inputStream.close();
-                httpConn.disconnect();
-
-                UploadFile uploadFileChoreo = new UploadFile(session);
-                UploadFile.UploadFileInputSet uploadFileInputs = uploadFileChoreo.newInputSet();
-
-                uploadFileInputs.set_AppKey(APP_ID);
-                uploadFileInputs.set_AppSecret(APP_SECRET);
-                uploadFileInputs.set_AccessToken(dropboxUser.getAccessToken());
-                uploadFileInputs.set_AccessTokenSecret(dropboxUser.getAccessSecret());
-                uploadFileInputs.set_Folder(getPath(path));
-                if (!dropboxUser.getEncryptionKeys().containsKey(path)) {
-                    KeyGenerator keyGen = KeyGenerator.getInstance("AES");
-                    SecureRandom random = new SecureRandom();
-                    keyGen.init(random);
-                    SecretKey secretKey = keyGen.generateKey();
-                    Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
-                    cipher.init(Cipher.ENCRYPT_MODE, secretKey);
-                    byte[] encrypted = cipher.doFinal(multipartFile.getBytes());
-                    String base64 = Base64.encode(encrypted);
-                    uploadFileInputs.set_FileContents(base64);
-                    uploadFileInputs.set_FileName(fileName);
-                    UploadFile.UploadFileResultSet uploadFileResults = uploadFileChoreo.execute(uploadFileInputs);
-                    JSONObject response = new JSONObject(uploadFileResults.get_Response());
-                    dropboxUser.getEncryptionKeys().put(response.getString("path"), secretKey);
-
-                } else {
-                    SecretKey secretKey = dropboxUser.getEncryptionKeys().get(path);
-                    Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
-                    cipher.init(Cipher.DECRYPT_MODE, secretKey);
-                    byte[] decrypted = cipher.doFinal(multipartFile.getBytes());
-                    String base64 = Base64.encode(decrypted);
-                    uploadFileInputs.set_FileContents(base64);
-                    uploadFileInputs.set_FileName(fileName);
-                    UploadFile.UploadFileResultSet uploadFileResults = uploadFileChoreo.execute(uploadFileInputs);
-                }
-            }
-        } catch (Exception ex) {
-            System.out.println("err");
-        }
-        return account;
-    }*/
-
     @Override
     public MultipartFile downloadFile(String path, Account account) {
         InputStream in = null;
-        try {
-            in = client.files().download(getPath(path)).getInputStream();
-            FileMetadata metadata = (FileMetadata) client.files().getMetadata(getPath(path));
-            if (in != null) {
-                MultipartFile multipartFile = new MockMultipartFile(metadata.getName(), in);
-                return multipartFile;
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        } catch (DownloadErrorException e) {
-            e.printStackTrace();
-        } catch (DbxException e) {
-            e.printStackTrace();
-        } finally {
-            if (in != null)
-                try {
-                    in.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
+        for (int i = 0; i < CHUNKED_UPLOAD_MAX_ATTEMPTS; i++) {
+            try {
+                in = client.files().download(getPath(path)).getInputStream();
+                FileMetadata metadata = (FileMetadata) client.files().getMetadata(getPath(path));
+                if (in != null) {
+                    MultipartFile multipartFile = new MockMultipartFile(metadata.getName(), in);
+                    return multipartFile;
                 }
+            } catch (NetworkIOException ex) {
+                continue;
+            } catch (DownloadErrorException e) {
+                continue;
+            } catch (DbxException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            } finally {
+                if (in != null)
+                    try {
+                        in.close();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+            }
         }
         return null;
     }

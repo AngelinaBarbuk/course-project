@@ -3,6 +3,8 @@ package by.fpm.barbuk.uploadBigFile;
 import by.fpm.barbuk.account.Account;
 import by.fpm.barbuk.dropbox.DropboxHelper;
 import by.fpm.barbuk.google.drive.GoogleHelper;
+import by.fpm.barbuk.utils.EncryptHelper;
+import by.fpm.barbuk.utils.EncryptedFile;
 import by.fpm.barbuk.yandex.YandexHelper;
 import com.temboo.core.TembooException;
 import org.json.JSONException;
@@ -13,9 +15,11 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.crypto.NoSuchPaddingException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.SequenceInputStream;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Vector;
@@ -34,6 +38,10 @@ public class BigFileHelper {
     private GoogleHelper googleHelper;
     @Autowired
     private YandexHelper yandexHelper;
+    private EncryptHelper encryptHelper = new EncryptHelper();
+
+    public BigFileHelper() throws NoSuchPaddingException, NoSuchAlgorithmException {
+    }
 
     public void uploadFile(MultipartFile file, Account account) throws IOException, TembooException, JSONException {
         System.out.println(Runtime.getRuntime().maxMemory());
@@ -54,12 +62,13 @@ public class BigFileHelper {
                 filePart.setSize(filepartSize);
                 byte[] content = new byte[(int) filepartSize];
                 file.getInputStream().read(content, 0, (int) filepartSize);
-            /*System.arraycopy(file.getBytes(), (int) (uploadedSize), content, 0, (int) (filepartSize));*/
                 MultipartFile multipartFile = new MockMultipartFile(getFileName(bigFile, i), getFileName(bigFile, i), file.getContentType(), content);
                 System.out.println(cloud + "   " + filepartSize);
+                EncryptedFile encrypted = encryptHelper.encrypt(multipartFile);
                 DownloadUploadFile helper = getHelper(cloud);
-                /*long size = helper.getAvailableSize(account);*/
-                filePart.setPath(helper.uploadFile(multipartFile, getPath(cloud), account));
+                String path = helper.uploadFile(encrypted.getFile(), getPath(cloud), account);
+                filePart.setPath(path);
+                filePart.setSecretKey(encrypted.getSecretKey());
                 bigFile.getParts().add(filePart);
                 uploadedSize += filepartSize;
             }
@@ -82,7 +91,8 @@ public class BigFileHelper {
             for (FilePart filePart : bigFile.getParts()) {
                 DownloadUploadFile helper = getHelper(filePart.getCloudName());
                 MultipartFile multipartFile = helper.downloadFile(filePart.getPath(), account);
-                streams.add(multipartFile.getInputStream());
+                MultipartFile decrypted = encryptHelper.decrypt(filePart.getSecretKey(), multipartFile);
+                streams.add(decrypted.getInputStream());
                 downloadedSize += multipartFile.getSize();
             }
             if (downloadedSize == bigFile.getSize()) {
@@ -104,7 +114,7 @@ public class BigFileHelper {
         return file.getOriginalFilename().substring(0, file.getOriginalFilename().lastIndexOf("."));
     }
 
-    private List<String> collectClouds(Account account) {
+    public List<String> collectClouds(Account account) {
         List<String> clouds = new ArrayList<>();
         if (account.getDropboxUser() != null) {
             clouds.add(DROPBOX);
@@ -144,10 +154,8 @@ public class BigFileHelper {
             case YANDEX: {
                 return yandexHelper;
             }
-            default: {
-                return dropboxHelper;
-            }
         }
+        return null;
     }
 
     private String getPath(String cloud) {
@@ -190,9 +198,10 @@ public class BigFileHelper {
         if (bigFile != null) {
             for (FilePart filePart : bigFile.getParts()) {
                 DownloadUploadFile helper = getHelper(filePart.getCloudName());
-                helper.delete(path,account);
+                helper.delete(filePart.getPath(), account);
             }
         }
+        account.getUserBigFiles().getBigFiles().remove(bigFile);
         return true;
     }
 
@@ -203,5 +212,13 @@ public class BigFileHelper {
             }
         }
         return null;
+    }
+
+    public EncryptHelper getEncryptHelper() {
+        return encryptHelper;
+    }
+
+    public void setEncryptHelper(EncryptHelper encryptHelper) {
+        this.encryptHelper = encryptHelper;
     }
 }

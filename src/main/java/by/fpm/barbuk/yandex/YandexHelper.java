@@ -3,13 +3,9 @@ package by.fpm.barbuk.yandex;
 import by.fpm.barbuk.account.Account;
 import by.fpm.barbuk.cloudEntities.CloudFile;
 import by.fpm.barbuk.cloudEntities.CloudFolder;
-import by.fpm.barbuk.temboo.TembooHelper;
 import by.fpm.barbuk.uploadBigFile.DownloadUploadFile;
 import com.temboo.core.TembooException;
-import com.yandex.disk.rest.Credentials;
-import com.yandex.disk.rest.ProgressListener;
-import com.yandex.disk.rest.ResourcesArgs;
-import com.yandex.disk.rest.RestClient;
+import com.yandex.disk.rest.*;
 import com.yandex.disk.rest.exceptions.ServerException;
 import com.yandex.disk.rest.exceptions.ServerIOException;
 import com.yandex.disk.rest.exceptions.WrongMethodException;
@@ -38,7 +34,7 @@ import java.util.List;
 
 @Component
 @Scope(value = "session", proxyMode = ScopedProxyMode.TARGET_CLASS)
-public class YandexHelper extends TembooHelper implements DownloadUploadFile {
+public class YandexHelper implements DownloadUploadFile {
 
     public static final String OAUTH_URL = "https://oauth.yandex.ru/authorize?response_type=code&client_id=";
     public static final String TOKEN_URL = "https://oauth.yandex.ru/token";
@@ -46,6 +42,7 @@ public class YandexHelper extends TembooHelper implements DownloadUploadFile {
     private static String CLIENT_SECRET = "ff71d2231c504ac6b3ec40eb2237d3b2";
     private RestClient restClient;
     private Credentials credentials;
+
 
     public YandexHelper() {
         System.out.println("new yandex helper");
@@ -175,18 +172,26 @@ public class YandexHelper extends TembooHelper implements DownloadUploadFile {
     }
 
 
-    public String getDownloadFileLink(String path, Account account) {
+    /*public String getDownloadFileLink(String path, Account account) {
         Resource resource = getFileMetadata(path, account);
         return resource.getPublicUrl();
-    }
+    }*/
 
     @Override
     public MultipartFile downloadFile(String path, Account account) {
-        File file = null;
-        try {
-            Resource resource = getFileMetadata(path, account);
-            file = new File(resource.getName());
-            restClient.downloadFile(path, file, new ProgressListener() {
+        for (int i = 0; i < CHUNKED_UPLOAD_MAX_ATTEMPTS; i++) {
+            File file = null;
+            try {
+                Resource resource = getFileMetadata(path, account);
+                file = new File(resource.getName());
+                File finalFile = file;
+                restClient.downloadFile(path, new DownloadListener() {
+                    @Override
+                    public OutputStream getOutputStream(boolean b) throws IOException {
+                        return new FileOutputStream(finalFile);
+                    }
+                });
+            /*restClient.downloadFile(path, file, new ProgressListener() {
                 @Override
                 public void updateProgress(long l, long l1) {
                 }
@@ -195,15 +200,16 @@ public class YandexHelper extends TembooHelper implements DownloadUploadFile {
                 public boolean hasCancelled() {
                     return false;
                 }
-            });
-            return new MockMultipartFile(resource.getName(), resource.getName(), resource.getMimeType(), FileUtils.openInputStream(file));
-        } catch (IOException e) {
-            e.printStackTrace();
-        } catch (ServerException e) {
-            e.printStackTrace();
-        } finally {
-            if (file != null)
-                file.delete();
+            });*/
+                return new MockMultipartFile(resource.getName(), resource.getName(), resource.getMimeType(), FileUtils.openInputStream(file));
+            } catch (IOException e) {
+                continue;
+            } catch (ServerException e) {
+                continue;
+            } finally {
+                if (file != null)
+                    file.delete();
+            }
         }
         return null;
     }
@@ -223,28 +229,30 @@ public class YandexHelper extends TembooHelper implements DownloadUploadFile {
 
     @Override
     public String uploadFile(MultipartFile file, String path, Account account) {
-        try {
-            Link link = restClient.getUploadLink(path + (!"disk:/".equals(path) ? "/" : "") + file.getOriginalFilename(),true);
-            restClient.uploadFile(link, true, multipartToFile(file), new ProgressListener() {
-                @Override
-                public void updateProgress(long l, long l1) {
+        for (int i = 0; i < CHUNKED_UPLOAD_MAX_ATTEMPTS; i++) {
+            try {
+                Link link = restClient.getUploadLink(path + (!"disk:/".equals(path) ? "/" : "") + file.getOriginalFilename(), true);
+                restClient.uploadFile(link, true, multipartToFile(file), new ProgressListener() {
+                    @Override
+                    public void updateProgress(long l, long l1) {
 
-                }
+                    }
 
-                @Override
-                public boolean hasCancelled() {
-                    return false;
-                }
-            });
-            return path + (!"disk:/".equals(path) ? "/" : "") + file.getOriginalFilename();
-        } catch (ServerIOException e) {
-            e.printStackTrace();
-        } catch (WrongMethodException e) {
-            e.printStackTrace();
-        } catch (ServerException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
+                    @Override
+                    public boolean hasCancelled() {
+                        return false;
+                    }
+                });
+                return path + (!"disk:/".equals(path) ? "/" : "") + file.getOriginalFilename();
+            } catch (ServerIOException e) {
+                continue;
+            } catch (WrongMethodException e) {
+                e.printStackTrace();
+            } catch (ServerException e) {
+                continue;
+            } catch (IOException e) {
+                continue;
+            }
         }
         return null;
     }

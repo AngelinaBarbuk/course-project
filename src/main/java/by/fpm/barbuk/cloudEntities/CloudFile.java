@@ -1,5 +1,7 @@
 package by.fpm.barbuk.cloudEntities;
 
+import by.fpm.barbuk.utils.SizeMapper;
+
 import java.io.Serializable;
 
 /**

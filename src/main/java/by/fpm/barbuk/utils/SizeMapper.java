@@ -1,4 +1,4 @@
-package by.fpm.barbuk.cloudEntities;
+package by.fpm.barbuk.utils;
 
 import java.text.DecimalFormat;
 
