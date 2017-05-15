@@ -291,11 +291,20 @@ public class DropboxHelper implements DownloadUploadFile {
         InputStream in = null;
         for (int i = 0; i < CHUNKED_UPLOAD_MAX_ATTEMPTS; i++) {
             try {
-                in = client.files().download(getPath(path)).getInputStream();
-                FileMetadata metadata = (FileMetadata) client.files().getMetadata(getPath(path));
-                if (in != null) {
-                    MultipartFile multipartFile = new MockMultipartFile(metadata.getName(), in);
-                    return multipartFile;
+
+                Metadata metadata = client.files().getMetadataBuilder(getPath(path)).withIncludeDeleted(true).start();
+                if (metadata instanceof DeletedMetadata) {
+                    ListRevisionsResult revisions = client.files().listRevisions(metadata.getPathLower());
+                    if(revisions.getIsDeleted()) {
+                        client.files().restore(metadata.getPathLower(), revisions.getEntries().get(revisions.getEntries().size() - 1).getRev());
+                    }
+                }
+                if (metadata != null) {
+                    in = client.files().download(metadata.getPathLower()).getInputStream();
+                    if (in != null) {
+                        MultipartFile multipartFile = new MockMultipartFile(metadata.getName(), in);
+                        return multipartFile;
+                    }
                 }
             } catch (NetworkIOException ex) {
                 continue;

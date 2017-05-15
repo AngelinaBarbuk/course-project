@@ -93,7 +93,7 @@ public class BigFileHelper {
                 MultipartFile multipartFile = helper.downloadFile(filePart.getPath(), account);
                 MultipartFile decrypted = encryptHelper.decrypt(filePart.getSecretKey(), multipartFile);
                 streams.add(decrypted.getInputStream());
-                downloadedSize += multipartFile.getSize();
+                downloadedSize += decrypted.getSize();
             }
             if (downloadedSize == bigFile.getSize()) {
                 SequenceInputStream inputStream = new SequenceInputStream(streams.elements());
